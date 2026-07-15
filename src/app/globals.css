@@ -748,3 +748,279 @@ code {
 .grouplist__item--active {
   border-color: var(--blue-600);
 }
+
+/* ---------- Workload detail, forms, and list toolbar ---------- */
+
+/* Vertical rhythm helper used across detail panels and the form. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stack .section-title {
+  margin: 0;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+.text-error {
+  color: var(--red-600);
+}
+
+/* List toolbar: sort links on the left, create button on the right. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sortlinks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.sortlink {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.sortlink--active {
+  color: var(--blue-600);
+}
+.table__link {
+  color: var(--blue-600);
+  font-weight: 500;
+}
+
+/* Extra button variants (base .btn is a blue text button). */
+.btn:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+.btn--primary:hover {
+  background: var(--blue-700);
+}
+.btn--danger {
+  color: var(--red-600);
+  background: transparent;
+}
+.btn--danger:hover {
+  background: var(--red-50);
+}
+.btn--sm {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Detail header */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.detail__bar {
+  margin-bottom: -8px;
+}
+.backlink {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.detail__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.detail__title {
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail__sub {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+}
+.detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Metadata strip (label over value) */
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.meta-grid dt {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.meta-grid dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Sub-tabs on the detail view */
+.subtabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.subtab {
+  padding: 10px 16px;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+.subtab:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+.subtab--active {
+  color: var(--blue-600);
+  border-bottom-color: var(--blue-600);
+}
+
+/* File / log cards */
+.file-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.file-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.file-card__tags {
+  display: flex;
+  gap: 6px;
+}
+.code-block {
+  margin: 0;
+  padding: 14px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.code-block--logs {
+  max-height: 420px;
+  overflow-y: auto;
+  white-space: pre;
+}
+
+/* Forms */
+.form {
+  max-width: 760px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field__label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.field__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.field-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.field-row .field {
+  flex: 1 1 200px;
+}
+.input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--blue-600);
+}
+.textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kv-row .input {
+  flex: 1 1 160px;
+  width: auto;
+}
+.file-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.form__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.delete-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.delete-action__error {
+  color: var(--red-600);
+  font-size: 12px;
+}

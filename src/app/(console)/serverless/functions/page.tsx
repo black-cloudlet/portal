@@ -1,23 +1,63 @@
+import Link from "next/link";
+
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listFunctions } from "@/lib/serverless";
+import { listFunctions, type WorkloadSort } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Functions" };
 export const dynamic = "force-dynamic";
 
+function parseSort(v?: string): WorkloadSort {
+  return v === "createdAt" ? "createdAt" : "name";
+}
+
 /** Functions tab: the active group's functions from the Serverless API. */
-export default async function FunctionsPage() {
+export default async function FunctionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
   const { enabled, activeGroup, accessToken } = await getServerlessContext();
   // The layout already shows the not-configured / no-group notice.
   if (!enabled || !activeGroup) return null;
 
+  const { sort } = await searchParams;
+  const activeSort = parseSort(sort);
+
+  let content;
   try {
-    const workloads = await listFunctions(activeGroup, accessToken);
-    return (
+    const workloads = await listFunctions(activeGroup, accessToken, activeSort);
+    content = (
       <WorkloadTable workloads={workloads} emptyLabel={`No functions in ${activeGroup} yet.`} />
     );
   } catch (err) {
-    return <ApiErrorNotice error={err} />;
+    content = <ApiErrorNotice error={err} />;
   }
+
+  return (
+    <div className="stack">
+      <div className="toolbar">
+        <div className="sortlinks">
+          <span className="text-muted">Sort:</span>
+          <Link
+            className={`sortlink${activeSort === "name" ? " sortlink--active" : ""}`}
+            href="/serverless/functions?sort=name"
+          >
+            Name
+          </Link>
+          <Link
+            className={`sortlink${activeSort === "createdAt" ? " sortlink--active" : ""}`}
+            href="/serverless/functions?sort=createdAt"
+          >
+            Created
+          </Link>
+        </div>
+        <Link className="btn btn--primary" href="/serverless/functions/new">
+          + Create function
+        </Link>
+      </div>
+      {content}
+    </div>
+  );
 }
