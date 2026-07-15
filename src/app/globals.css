@@ -670,6 +670,14 @@ code {
 .notice--error {
   border-left-color: var(--red-600);
 }
+.notice__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.notice__code {
+  font-weight: 500;
+}
 
 /* ---------- Table ---------- */
 .table-wrap {

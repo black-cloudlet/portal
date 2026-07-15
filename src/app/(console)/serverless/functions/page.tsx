@@ -1,5 +1,6 @@
+import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listFunctions, ServerlessApiError } from "@/lib/serverless";
+import { listFunctions } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Functions" };
@@ -17,10 +18,6 @@ export default async function FunctionsPage() {
       <WorkloadTable workloads={workloads} emptyLabel={`No functions in ${activeGroup} yet.`} />
     );
   } catch (err) {
-    const message =
-      err instanceof ServerlessApiError
-        ? err.message
-        : `Unexpected error: ${(err as Error).message}`;
-    return <div className="notice notice--error">{message}</div>;
+    return <ApiErrorNotice error={err} />;
   }
 }
