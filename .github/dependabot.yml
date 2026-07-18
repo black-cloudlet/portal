@@ -9,12 +9,12 @@ updates:
     groups:
       npm-deps:
         patterns: ["*"]
-    # A framework major (Next.js) needs a hand-driven migration, so keep it out
-    # of the automated group sweep; the bot still proposes minors/patches.
+    # Majors need a hand-driven migration - a framework or toolchain bump
+    # (Next.js, TypeScript, ESLint, Vitest, ...) reliably breaks lint/build/tests
+    # and can't be validated by a bot. Keep every major out of the automated
+    # group sweep; the bot still proposes minors and patches for the whole tree.
     ignore:
-      - dependency-name: "next"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "eslint-config-next"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions - keeps the SHA-pinned actions current (updates the pin and
