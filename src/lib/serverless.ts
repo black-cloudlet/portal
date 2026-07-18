@@ -1,22 +1,26 @@
 /**
  * Thin server-side client for the Serverless API.
  *
- * All calls run on the server (React Server Components / route handlers) and
- * forward the user's SSO access token as a Bearer, so the API applies the exact
- * same group-based authorization it would for any other OIDC caller. The token
- * never reaches the browser. The `group` query param is the normalized active
- * group - identical to what the API re-normalizes on its side.
+ * All calls run on the server (React Server Components / route handlers / server
+ * actions) and forward the user's SSO access token as a Bearer, so the API
+ * applies the exact same group-based authorization it would for any other OIDC
+ * caller. The token never reaches the browser. The active group is a path
+ * segment (`/api/v1/groups/{group}/...`) - identical to what the API normalizes
+ * on its side.
  *
- * The shapes below mirror the API's `WorkloadSummary` and `/info` responses
- * (see api/models/common.py, api/models/info.py).
+ * The shapes below mirror the API's response/request models (see
+ * api/models/common.py, function.py, container.py, info.py).
  */
 
 import { getService } from "@/lib/services";
 
+/** The two workload offerings the console fronts. */
+export type WorkloadType = "function" | "container";
+
 export interface WorkloadSummary {
   name: string;
   group: string;
-  type: "function" | "container";
+  type: WorkloadType;
   hostname: string;
   overallStatus: string;
   size: string | null;
@@ -24,23 +28,227 @@ export interface WorkloadSummary {
   sites: string[];
 }
 
+/** Live resource consumption summed over a workload's running pods. */
+export interface ResourceUsage {
+  cpu: string | null;
+  memory: string | null;
+}
+
+/** The deploy/health state of a workload at a single site. */
+export interface SiteStatus {
+  site: string;
+  status: string;
+  revision: string | null;
+  error: string | null;
+  replicas: number | null;
+  usage: ResourceUsage | null;
+}
+
+/** An env var read back from a workload; secret values are redacted to null. */
+export interface EnvVarView {
+  name: string;
+  value: string | null;
+  secret: boolean;
+}
+
+/** A mounted file read back from a workload; secret contents are redacted. */
+export interface FileView {
+  mountPath: string;
+  readOnly: boolean;
+  secret: boolean;
+  content: string | null;
+}
+
+/** Autoscaling settings (desired state). */
+export interface Scaling {
+  minScale: number;
+  maxScale: number;
+  metric: string;
+  target: number | null;
+  scaleDownDelay: string | null;
+}
+
+/** Full single-workload view (`GET .../{name}`). */
+export interface WorkloadDetail {
+  name: string;
+  group: string;
+  type: WorkloadType;
+  hostname: string;
+  overallStatus: string;
+  size: string | null;
+  createdAt: string | null;
+  sites: SiteStatus[];
+  statusUrl: string | null;
+  scaling: Scaling | null;
+  env: EnvVarView[];
+  files: FileView[];
+  // Function source (functions deal in source, never images).
+  runtime?: string | null;
+  gitRepo?: string | null;
+  branch?: string | null;
+  // Container source.
+  image?: string | null;
+  registryUsername?: string | null;
+}
+
+export interface PodLogs {
+  pod: string;
+  container: string;
+  revision: string | null;
+  logs: string;
+}
+
+export interface LogsResponse {
+  name: string;
+  group: string;
+  type: WorkloadType;
+  site: string;
+  pods: PodLogs[];
+}
+
+/* ---------- /info capabilities (drive the create/edit form) ---------- */
+
+export interface MetricTarget {
+  default: number;
+  min: number;
+  max: number | null;
+  unit: string;
+}
+
+export interface MetricCapability {
+  name: string;
+  minScaleFloor: number;
+  target: MetricTarget;
+}
+
+export interface ScaleDownDelayCapability {
+  format: string;
+  min: string;
+  max: string;
+  default: string | null;
+}
+
+export interface ScalingCapabilities {
+  defaultMetric: string;
+  metrics: MetricCapability[];
+  scaleDownDelay: ScaleDownDelayCapability;
+}
+
 export interface PlatformInfo {
   version: string;
   sites: string[];
   runtimes: string[];
   sizes: string[];
+  scaling: ScalingCapabilities;
   routeDomain: string;
   defaultHostTemplate: string;
+}
+
+/* ---------- Request inputs (create/update bodies) ---------- */
+
+export interface ScalingInput {
+  minScale: number;
+  maxScale: number;
+  metric: string;
+  target?: number | null;
+  scaleDownDelay?: string | null;
+}
+
+export interface EnvVarInput {
+  name: string;
+  // Keep-on-write: a secret var sent with value null/omitted keeps the stored
+  // value on update. A non-secret var always needs a value; a brand-new secret
+  // needs one too. Send a value to set/change it.
+  value?: string | null;
+  secret: boolean;
+}
+
+export interface FileInput {
+  mountPath: string;
+  // Keep-on-write: a secret file sent with content null/omitted keeps the
+  // stored content on update. A non-secret file always needs content.
+  content?: string | null;
+  secret: boolean;
+  readOnly: boolean;
+}
+
+export interface FunctionCreateInput {
+  name: string;
+  gitRepo: string;
+  branch: string;
+  gitToken: string;
+  runtime: string;
+  env: EnvVarInput[];
+  files: FileInput[];
+  scaling: ScalingInput;
+  size: string;
+  sites?: string[] | null;
+  hostname?: string | null;
+}
+
+export interface FunctionUpdateInput {
+  gitRepo?: string | null;
+  branch?: string | null;
+  gitToken?: string | null;
+  runtime?: string | null;
+  env: EnvVarInput[];
+  files: FileInput[];
+  scaling: ScalingInput;
+  size: string;
+  hostname?: string | null;
+}
+
+export interface ContainerCreateInput {
+  name: string;
+  image: string;
+  registryUsername?: string | null;
+  registryToken?: string | null;
+  env: EnvVarInput[];
+  files: FileInput[];
+  scaling: ScalingInput;
+  size: string;
+  sites?: string[] | null;
+  hostname?: string | null;
+}
+
+export interface ContainerUpdateInput {
+  image?: string | null;
+  registryUsername?: string | null;
+  registryToken?: string | null;
+  env: EnvVarInput[];
+  files: FileInput[];
+  scaling: ScalingInput;
+  size: string;
+  hostname?: string | null;
 }
 
 export class ServerlessApiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /** Machine-readable code from the API's error envelope (e.g. NOT_FOUND). */
+    readonly code?: string,
+    /** Correlation id from the envelope, for the user to quote to support. */
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = "ServerlessApiError";
   }
+}
+
+/**
+ * The Serverless API's standard error envelope (see common/errors.py). Every
+ * failed call returns this shape, so the console surfaces the real reason a
+ * workload call failed - and the requestId to trace it - not a bare status.
+ */
+interface ErrorEnvelope {
+  error?: {
+    status?: number;
+    code?: string;
+    message?: string;
+    details?: unknown[];
+    requestId?: string | null;
+  };
 }
 
 function baseUrl(): string {
@@ -51,6 +259,11 @@ function baseUrl(): string {
     );
   }
   return svc.apiBaseUrl;
+}
+
+/** The collection path for a workload type, e.g. `/api/v1/groups/team/functions`. */
+function collectionPath(type: WorkloadType, group: string): string {
+  return `/api/v1/groups/${encodeURIComponent(group)}/${type}s`;
 }
 
 async function apiGet<T>(path: string, accessToken: string | undefined): Promise<T> {
@@ -68,9 +281,63 @@ async function apiGet<T>(path: string, accessToken: string | undefined): Promise
     throw new ServerlessApiError(`Could not reach the Serverless API: ${(err as Error).message}`);
   }
   if (!resp.ok) {
-    throw new ServerlessApiError(`Serverless API returned ${resp.status} for ${path}`, resp.status);
+    throw await toApiError(resp, path);
   }
   return (await resp.json()) as T;
+}
+
+/**
+ * Send a write (POST/PUT/DELETE) with a JSON body, forwarding the Bearer token.
+ * Returns the parsed body, or null for a 204 (delete).
+ */
+async function apiSend<T>(
+  method: "POST" | "PUT" | "DELETE",
+  path: string,
+  accessToken: string | undefined,
+  body?: unknown,
+): Promise<T | null> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+
+  let resp: Response;
+  try {
+    resp = await fetch(`${baseUrl()}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (err) {
+    throw new ServerlessApiError(`Could not reach the Serverless API: ${(err as Error).message}`);
+  }
+  if (!resp.ok) {
+    throw await toApiError(resp, path);
+  }
+  if (resp.status === 204) return null;
+  return (await resp.json()) as T;
+}
+
+/**
+ * Turn a non-2xx response into a ServerlessApiError, preferring the API's error
+ * envelope so the UI shows the API's own message, code, and requestId; falls
+ * back to the status line for a non-JSON body (e.g. a proxy error page).
+ */
+async function toApiError(resp: Response, path: string): Promise<ServerlessApiError> {
+  let envelope: ErrorEnvelope | null = null;
+  try {
+    envelope = (await resp.json()) as ErrorEnvelope;
+  } catch {
+    // Non-JSON body; fall back to the status line below.
+  }
+  const err = envelope?.error;
+  const message = err?.message ?? `Serverless API returned ${resp.status} for ${path}`;
+  return new ServerlessApiError(
+    message,
+    err?.status ?? resp.status,
+    err?.code,
+    err?.requestId ?? undefined,
+  );
 }
 
 /** Public platform capabilities (`GET /api/v1/info`); no auth required. */
@@ -78,20 +345,43 @@ export function getPlatformInfo(): Promise<PlatformInfo> {
   return apiGet<PlatformInfo>("/api/v1/info", undefined);
 }
 
-/** Functions owned by `group` (`GET /api/v1/functions?group=...`). */
-export function listFunctions(group: string, accessToken: string | undefined) {
+/** Sort keys the list endpoints accept. */
+export type WorkloadSort = "name" | "createdAt";
+
+/** Functions owned by `group` (`GET .../functions`). */
+export function listFunctions(
+  group: string,
+  accessToken: string | undefined,
+  sort: WorkloadSort = "name",
+) {
   return apiGet<WorkloadSummary[]>(
-    `/api/v1/functions?group=${encodeURIComponent(group)}`,
+    `${collectionPath("function", group)}?sort=${sort}`,
     accessToken,
   );
 }
 
-/** Containers owned by `group` (`GET /api/v1/containers?group=...`). */
-export function listContainers(group: string, accessToken: string | undefined) {
+/** Containers owned by `group` (`GET .../containers`). */
+export function listContainers(
+  group: string,
+  accessToken: string | undefined,
+  sort: WorkloadSort = "name",
+) {
   return apiGet<WorkloadSummary[]>(
-    `/api/v1/containers?group=${encodeURIComponent(group)}`,
+    `${collectionPath("container", group)}?sort=${sort}`,
     accessToken,
   );
+}
+
+/** List one workload type for a group (`GET .../{type}s`). */
+export function listWorkloadsOfType(
+  type: WorkloadType,
+  group: string,
+  accessToken: string | undefined,
+  sort: WorkloadSort = "name",
+) {
+  return type === "function"
+    ? listFunctions(group, accessToken, sort)
+    : listContainers(group, accessToken, sort);
 }
 
 /** All workloads (functions + containers) for a group, merged and sorted. */
@@ -104,4 +394,81 @@ export async function listWorkloads(
     listContainers(group, accessToken),
   ]);
   return [...functions, ...containers].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** One workload's full detail (`GET .../{type}s/{name}`). */
+export function getWorkload(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<WorkloadDetail> {
+  return apiGet<WorkloadDetail>(
+    `${collectionPath(type, group)}/${encodeURIComponent(name)}`,
+    accessToken,
+  );
+}
+
+/** A workload's pod logs from the local site (`GET .../{type}s/{name}/logs`). */
+export function getWorkloadLogs(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+  opts: { container?: string; sinceSeconds?: number; limitBytes?: number } = {},
+): Promise<LogsResponse> {
+  const q = new URLSearchParams();
+  if (opts.container) q.set("container", opts.container);
+  if (opts.sinceSeconds) q.set("sinceSeconds", String(opts.sinceSeconds));
+  if (opts.limitBytes) q.set("limitBytes", String(opts.limitBytes));
+  const suffix = q.toString() ? `?${q}` : "";
+  return apiGet<LogsResponse>(
+    `${collectionPath(type, group)}/${encodeURIComponent(name)}/logs${suffix}`,
+    accessToken,
+  );
+}
+
+/** Create a workload (`POST .../{type}s`); returns 202 + detail with statusUrl. */
+export function createWorkload(
+  type: WorkloadType,
+  group: string,
+  spec: FunctionCreateInput | ContainerCreateInput,
+  accessToken: string | undefined,
+): Promise<WorkloadDetail | null> {
+  return apiSend<WorkloadDetail>("POST", collectionPath(type, group), accessToken, spec);
+}
+
+/** Update a workload (`PUT .../{type}s/{name}`); full replace of the spec. */
+export function updateWorkload(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  spec: FunctionUpdateInput | ContainerUpdateInput,
+  accessToken: string | undefined,
+): Promise<WorkloadDetail | null> {
+  return apiSend<WorkloadDetail>(
+    "PUT",
+    `${collectionPath(type, group)}/${encodeURIComponent(name)}`,
+    accessToken,
+    spec,
+  );
+}
+
+/** Delete a workload (`DELETE .../{type}s/{name}`); 204 on success. */
+export function deleteWorkload(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<null> {
+  return apiSend<null>(
+    "DELETE",
+    `${collectionPath(type, group)}/${encodeURIComponent(name)}`,
+    accessToken,
+  ) as Promise<null>;
+}
+
+/** The URL path segment for a workload type ("functions" | "containers"). */
+export function typeSegment(type: WorkloadType): "functions" | "containers" {
+  return type === "function" ? "functions" : "containers";
 }
