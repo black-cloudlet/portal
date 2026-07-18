@@ -4,7 +4,7 @@
 # PIP_INDEX_URL, so builds point at the internal mirror.
 
 # ---- deps: install node_modules against the (mirror) registry ----
-FROM node:22-slim AS deps
+FROM node:24-slim AS deps
 ARG NPM_CONFIG_REGISTRY
 ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
 WORKDIR /app
@@ -12,7 +12,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # ---- build: compile the standalone Next.js output ----
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime: minimal image running server.js as non-root ----
-FROM node:22-slim AS runtime
+FROM node:24-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

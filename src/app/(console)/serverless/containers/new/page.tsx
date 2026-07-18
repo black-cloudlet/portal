@@ -1,6 +1,6 @@
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadForm from "@/components/WorkloadForm";
-import { getPlatformInfo } from "@/lib/serverless";
+import { getPlatformInfo, type PlatformInfo } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +12,11 @@ export default async function NewContainerPage() {
     return <div className="notice notice--warn">The Serverless API is not configured.</div>;
   if (!activeGroup) return <div className="notice notice--warn">You have no active group.</div>;
 
+  let info: PlatformInfo;
   try {
-    const info = await getPlatformInfo();
-    return <WorkloadForm mode="create" type="container" info={info} group={activeGroup} />;
+    info = await getPlatformInfo();
   } catch (err) {
     return <ApiErrorNotice error={err} />;
   }
+  return <WorkloadForm mode="create" type="container" info={info} group={activeGroup} />;
 }

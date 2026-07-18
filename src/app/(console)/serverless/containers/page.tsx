@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listContainers, type WorkloadSort } from "@/lib/serverless";
+import { listContainers, type WorkloadSort, type WorkloadSummary } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Containers" };
@@ -25,14 +25,12 @@ export default async function ContainersPage({
   const { sort } = await searchParams;
   const activeSort = parseSort(sort);
 
-  let content;
+  let workloads: WorkloadSummary[] | null = null;
+  let fetchError: unknown = null;
   try {
-    const workloads = await listContainers(activeGroup, accessToken, activeSort);
-    content = (
-      <WorkloadTable workloads={workloads} emptyLabel={`No containers in ${activeGroup} yet.`} />
-    );
+    workloads = await listContainers(activeGroup, accessToken, activeSort);
   } catch (err) {
-    content = <ApiErrorNotice error={err} />;
+    fetchError = err;
   }
 
   return (
@@ -57,7 +55,14 @@ export default async function ContainersPage({
           + Create container
         </Link>
       </div>
-      {content}
+      {fetchError ? (
+        <ApiErrorNotice error={fetchError} />
+      ) : (
+        <WorkloadTable
+          workloads={workloads ?? []}
+          emptyLabel={`No containers in ${activeGroup} yet.`}
+        />
+      )}
     </div>
   );
 }

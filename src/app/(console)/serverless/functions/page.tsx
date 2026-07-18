@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listFunctions, type WorkloadSort } from "@/lib/serverless";
+import { listFunctions, type WorkloadSort, type WorkloadSummary } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Functions" };
@@ -25,14 +25,12 @@ export default async function FunctionsPage({
   const { sort } = await searchParams;
   const activeSort = parseSort(sort);
 
-  let content;
+  let workloads: WorkloadSummary[] | null = null;
+  let fetchError: unknown = null;
   try {
-    const workloads = await listFunctions(activeGroup, accessToken, activeSort);
-    content = (
-      <WorkloadTable workloads={workloads} emptyLabel={`No functions in ${activeGroup} yet.`} />
-    );
+    workloads = await listFunctions(activeGroup, accessToken, activeSort);
   } catch (err) {
-    content = <ApiErrorNotice error={err} />;
+    fetchError = err;
   }
 
   return (
@@ -57,7 +55,14 @@ export default async function FunctionsPage({
           + Create function
         </Link>
       </div>
-      {content}
+      {fetchError ? (
+        <ApiErrorNotice error={fetchError} />
+      ) : (
+        <WorkloadTable
+          workloads={workloads ?? []}
+          emptyLabel={`No functions in ${activeGroup} yet.`}
+        />
+      )}
     </div>
   );
 }
