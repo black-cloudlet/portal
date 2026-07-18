@@ -31,22 +31,50 @@ interface Props {
   initial?: WorkloadDetail;
 }
 
-/** A blank env/file row for the "add" buttons. */
-const emptyEnv = (): EnvVarInput => ({ name: "", value: "", secret: false });
-const emptyFile = (): FileInput => ({ mountPath: "", content: "", secret: false, readOnly: true });
+const FORM_TABS = [
+  { id: "general", label: "General" },
+  { id: "variables", label: "Variables" },
+  { id: "secrets", label: "Secrets" },
+  { id: "files", label: "Files" },
+  { id: "advanced", label: "Advanced" },
+] as const;
+type FormTab = (typeof FORM_TABS)[number]["id"];
+
+interface VarRow {
+  name: string;
+  value: string;
+}
+interface SecretRow {
+  name: string;
+  value: string;
+  existing: boolean;
+}
+interface FileRow {
+  mountPath: string;
+  content: string;
+  secret: boolean;
+  readOnly: boolean;
+  existing: boolean;
+}
 
 /**
- * Create or edit a function/container. Renders the fields for the workload type
- * against the platform capabilities from /info (sizes, runtimes, scaling), and
- * submits via the create/update server actions. On success the action redirects
- * to the workload; API validation errors are shown inline.
+ * Create or edit a function/container, organized into tabs (General, Variables,
+ * Secrets, Files, Advanced) driven by the platform capabilities from /info.
+ *
+ * Edit follows the API's keep-on-write contract: a secret left blank keeps its
+ * stored value, a value entered changes it, and dropping a row removes it. The
+ * function git token is stored server-side, so it is only sent to rotate it; the
+ * container registry token is kept when the username is echoed without a token.
  */
 export default function WorkloadForm({ mode, type, info, group, initial }: Props) {
   const isFn = type === "function";
   const seg = isFn ? "functions" : "containers";
+  const isEdit = mode === "edit";
   const sizes = info.sizes.length ? info.sizes : ["small"];
   const metrics = info.scaling.metrics.map((m) => m.name);
   const defaultMetric = info.scaling.defaultMetric || metrics[0] || "concurrency";
+
+  const [tab, setTab] = useState<FormTab>("general");
 
   // Identity / source
   const [name, setName] = useState(initial?.name ?? "");
@@ -58,23 +86,30 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
   const [registryUsername, setRegistryUsername] = useState(initial?.registryUsername ?? "");
   const [registryToken, setRegistryToken] = useState("");
 
-  // Common config
-  const [size, setSize] = useState(initial?.size ?? sizes[0]);
-  const [hostname, setHostname] = useState("");
-  const [sites, setSites] = useState<string[]>([]);
-  const [env, setEnv] = useState<EnvVarInput[]>(
-    initial?.env.map((e) => ({ name: e.name, value: e.value ?? "", secret: e.secret })) ?? [],
+  // Variables (non-secret env) and Secrets (secret env) as separate lists.
+  const [variables, setVariables] = useState<VarRow[]>(
+    initial?.env.filter((e) => !e.secret).map((e) => ({ name: e.name, value: e.value ?? "" })) ??
+      [],
   );
-  const [files, setFiles] = useState<FileInput[]>(
+  const [secrets, setSecrets] = useState<SecretRow[]>(
+    initial?.env
+      .filter((e) => e.secret)
+      .map((e) => ({ name: e.name, value: "", existing: true })) ?? [],
+  );
+  const [files, setFiles] = useState<FileRow[]>(
     initial?.files.map((f) => ({
       mountPath: f.mountPath,
       content: f.content ?? "",
       secret: f.secret,
       readOnly: f.readOnly,
+      existing: true,
     })) ?? [],
   );
 
-  // Scaling
+  // Advanced: placement + scaling
+  const [size, setSize] = useState(initial?.size ?? sizes[0]);
+  const [hostname, setHostname] = useState("");
+  const [sites, setSites] = useState<string[]>([]);
   const initScale = initial?.scaling;
   const [metric, setMetric] = useState(initScale?.metric ?? defaultMetric);
   const [minScale, setMinScale] = useState(String(initScale?.minScale ?? 0));
@@ -84,10 +119,6 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
-
-  const hasSecrets =
-    (initial?.env.some((e) => e.secret) ?? false) ||
-    (initial?.files.some((f) => f.secret) ?? false);
 
   function buildScaling(): ScalingInput {
     return {
@@ -99,22 +130,102 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
     };
   }
 
-  function cleanEnv(): EnvVarInput[] {
-    return env.filter((e) => e.name.trim() !== "");
+  /** Merge Variables + Secrets into the API env list, applying keep-on-write. */
+  function buildEnv(): EnvVarInput[] {
+    const out: EnvVarInput[] = [];
+    for (const v of variables) {
+      if (v.name.trim() === "") continue;
+      out.push({ name: v.name.trim(), value: v.value, secret: false });
+    }
+    for (const s of secrets) {
+      const n = s.name.trim();
+      if (n === "") continue;
+      if (s.value.trim() !== "") {
+        out.push({ name: n, value: s.value, secret: true }); // set / change
+      } else if (isEdit && s.existing) {
+        out.push({ name: n, secret: true, value: null }); // keep stored
+      } else {
+        out.push({ name: n, value: "", secret: true }); // new secret (validated below)
+      }
+    }
+    return out;
   }
-  function cleanFiles(): FileInput[] {
-    return files.filter((f) => f.mountPath.trim() !== "");
+
+  function buildFiles(): FileInput[] {
+    const out: FileInput[] = [];
+    for (const f of files) {
+      const mp = f.mountPath.trim();
+      if (mp === "") continue;
+      const base = { mountPath: mp, secret: f.secret, readOnly: f.readOnly };
+      if (f.secret) {
+        if (f.content.trim() !== "")
+          out.push({ ...base, content: f.content }); // set / change
+        else if (isEdit && f.existing)
+          out.push(base); // keep stored (content omitted)
+        else out.push({ ...base, content: "" }); // new secret file (validated below)
+      } else {
+        out.push({ ...base, content: f.content }); // non-secret always carries content
+      }
+    }
+    return out;
+  }
+
+  /** Client-side checks that mirror the API's required fields. */
+  function validate(): { tab: FormTab; message: string } | null {
+    if (mode === "create" && name.trim() === "")
+      return { tab: "general", message: "Name is required." };
+    if (isFn) {
+      if (mode === "create") {
+        if (gitRepo.trim() === "")
+          return { tab: "general", message: "Git repository is required." };
+        if (gitToken.trim() === "") return { tab: "general", message: "Git token is required." };
+      }
+    } else {
+      if (mode === "create" && image.trim() === "")
+        return { tab: "general", message: "Image is required." };
+      const hasUser = registryUsername.trim() !== "";
+      const hasToken = registryToken.trim() !== "";
+      // A token always needs a username; on create the two are all-or-nothing
+      // (username-only "keep" only makes sense against an existing pull secret).
+      if (hasToken && !hasUser)
+        return { tab: "general", message: "A registry token needs a username." };
+      if (mode === "create" && hasUser && !hasToken)
+        return {
+          tab: "general",
+          message: "Provide a registry token with the username, or leave both blank.",
+        };
+    }
+    for (const s of secrets) {
+      if (s.name.trim() !== "" && s.value.trim() === "" && !(isEdit && s.existing))
+        return { tab: "secrets", message: `Secret "${s.name}" needs a value.` };
+    }
+    for (const f of files) {
+      if (
+        f.mountPath.trim() !== "" &&
+        f.secret &&
+        f.content.trim() === "" &&
+        !(isEdit && f.existing)
+      )
+        return { tab: "files", message: `Secret file "${f.mountPath}" needs content.` };
+    }
+    return null;
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const scaling = buildScaling();
+    const problem = validate();
+    if (problem) {
+      setTab(problem.tab);
+      setError({ error: problem.message });
+      return;
+    }
+
     const common = {
-      env: cleanEnv(),
-      files: cleanFiles(),
-      scaling,
+      env: buildEnv(),
+      files: buildFiles(),
+      scaling: buildScaling(),
       size,
       hostname: hostname.trim() === "" ? null : hostname.trim(),
     };
@@ -145,26 +256,26 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
           };
           res = await createWorkloadAction("container", spec);
         }
+      } else if (isFn) {
+        const spec: FunctionUpdateInput = {
+          // Build inputs are always sent (unchanged values are a no-op); the
+          // stored git token rebuilds on a change. A token is sent only to rotate.
+          gitRepo: gitRepo || null,
+          branch: branch || null,
+          runtime: runtime || null,
+          gitToken: gitToken.trim() || null,
+          ...common,
+        };
+        res = await updateWorkloadAction("function", initial!.name, spec);
       } else {
-        if (isFn) {
-          const spec: FunctionUpdateInput = {
-            // Send build inputs only when a token is supplied to rebuild.
-            gitRepo: gitToken.trim() ? gitRepo || null : null,
-            branch: gitToken.trim() ? branch || null : null,
-            runtime: gitToken.trim() ? runtime || null : null,
-            gitToken: gitToken.trim() || null,
-            ...common,
-          };
-          res = await updateWorkloadAction("function", initial!.name, spec);
-        } else {
-          const spec: ContainerUpdateInput = {
-            image: image.trim() || null,
-            registryUsername: registryUsername.trim() || null,
-            registryToken: registryToken.trim() || null,
-            ...common,
-          };
-          res = await updateWorkloadAction("container", initial!.name, spec);
-        }
+        const spec: ContainerUpdateInput = {
+          // Registry: username+token rotates, username-only keeps, neither removes.
+          image: image.trim() || null,
+          registryUsername: registryUsername.trim() || null,
+          registryToken: registryToken.trim() || null,
+          ...common,
+        };
+        res = await updateWorkloadAction("container", initial!.name, spec);
       }
       if (res?.error) setError(res);
     });
@@ -178,13 +289,12 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
           .replace("{routeDomain}", info.routeDomain)
       : null;
 
+  const cancelHref = isEdit ? `/serverless/${seg}/${initial!.name}` : `/serverless/${seg}`;
+
   return (
     <form className="form stack" onSubmit={submit}>
       <div className="detail__bar">
-        <Link
-          className="backlink"
-          href={mode === "edit" ? `/serverless/${seg}/${initial!.name}` : `/serverless/${seg}`}
-        >
+        <Link className="backlink" href={cancelHref}>
           ← Cancel
         </Link>
       </div>
@@ -193,20 +303,32 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
         {mode === "create" ? `New ${type}` : `Edit ${initial!.name}`}
       </h2>
 
-      {mode === "edit" && (
+      {isEdit && (
         <div className="notice notice--warn">
-          Saving replaces the workload&rsquo;s full spec. Secret values are never shown, so
-          {hasSecrets
-            ? " re-enter any secrets below or they will be cleared."
-            : " any secret you add must be entered here."}
-          {isFn && " Changing the repo, branch, or runtime requires a git token to rebuild."}
+          A secret left blank keeps its stored value — enter a value to change it, or remove the row
+          to delete it.
+          {isFn
+            ? " Leave the git token blank to keep the stored one, or enter one to rotate it; changing the repo, branch, or runtime rebuilds with the stored token."
+            : " Leave the registry token blank to keep it, or clear the username to remove the pull secret."}
         </div>
       )}
 
-      {/* ---- Identity / source ---- */}
-      <section className="stack">
-        <h3 className="section-title">{isFn ? "Function source" : "Container image"}</h3>
+      <nav className="form-tabs" aria-label="Form sections">
+        {FORM_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`form-tab${t.id === tab ? " form-tab--active" : ""}`}
+            aria-current={t.id === tab ? "true" : undefined}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
 
+      {/* ---- General ---- */}
+      <div className="form-panel stack" hidden={tab !== "general"}>
         {mode === "create" && (
           <label className="field">
             <span className="field__label">Name</span>
@@ -215,7 +337,6 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="my-workload"
-              required
             />
             <span className="field__hint">
               Lowercase DNS-1123 label.{" "}
@@ -237,7 +358,6 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
                 value={gitRepo}
                 onChange={(e) => setGitRepo(e.target.value)}
                 placeholder="https://git.internal/team/app.git"
-                required={mode === "create"}
               />
             </label>
             <div className="field-row">
@@ -265,16 +385,13 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
               </label>
             </div>
             <label className="field">
-              <span className="field__label">
-                Git token{mode === "edit" ? " (only to rebuild)" : ""}
-              </span>
+              <span className="field__label">Git token{isEdit ? " (only to rotate)" : ""}</span>
               <input
                 className="input"
                 type="password"
                 value={gitToken}
                 onChange={(e) => setGitToken(e.target.value)}
-                placeholder={mode === "edit" ? "leave blank to keep the current image" : ""}
-                required={mode === "create"}
+                placeholder={isEdit ? "leave blank to keep the stored token" : ""}
                 autoComplete="off"
               />
             </label>
@@ -288,7 +405,6 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
                 value={image}
                 onChange={(e) => setImage(e.target.value)}
                 placeholder="registry.internal/team/app:latest"
-                required={mode === "create"}
               />
             </label>
             <div className="field-row">
@@ -302,108 +418,55 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
                 />
               </label>
               <label className="field">
-                <span className="field__label">Registry token (optional)</span>
+                <span className="field__label">
+                  Registry token{isEdit ? " (only to rotate)" : ""}
+                </span>
                 <input
                   className="input"
                   type="password"
                   value={registryToken}
                   onChange={(e) => setRegistryToken(e.target.value)}
-                  placeholder={mode === "edit" ? "leave blank to keep" : ""}
+                  placeholder={isEdit ? "leave blank to keep" : ""}
                   autoComplete="off"
                 />
               </label>
             </div>
             <span className="field__hint">
-              Provide username and token together for a private image, or leave both blank for a
-              public one.
+              {isEdit
+                ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
+                : "Provide username and token together for a private image, or leave both blank for a public one."}
             </span>
           </>
         )}
-      </section>
+      </div>
 
-      {/* ---- Placement ---- */}
-      <section className="stack">
-        <h3 className="section-title">Placement</h3>
-        <div className="field-row">
-          <label className="field">
-            <span className="field__label">Size</span>
-            <select className="input" value={size} onChange={(e) => setSize(e.target.value)}>
-              {sizes.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field__label">Custom hostname (optional)</span>
-            <input
-              className="input"
-              value={hostname}
-              onChange={(e) => setHostname(e.target.value)}
-              placeholder="defaults to the generated host"
-            />
-          </label>
-        </div>
-        {mode === "create" && info.sites.length > 0 && (
-          <div className="field">
-            <span className="field__label">Sites (none selected = all)</span>
-            <div className="checks">
-              {info.sites.map((s) => (
-                <label key={s} className="check">
-                  <input
-                    type="checkbox"
-                    checked={sites.includes(s)}
-                    onChange={(e) =>
-                      setSites((prev) =>
-                        e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
-                      )
-                    }
-                  />
-                  {s}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ---- Environment ---- */}
-      <section className="stack">
-        <h3 className="section-title">Environment variables</h3>
-        {env.map((row, i) => (
+      {/* ---- Variables (non-secret env) ---- */}
+      <div className="form-panel stack" hidden={tab !== "variables"}>
+        <p className="field__hint">Plain environment variables, stored inline on the workload.</p>
+        {variables.map((row, i) => (
           <div key={i} className="kv-row">
             <input
               className="input"
               placeholder="NAME"
               value={row.name}
               onChange={(e) =>
-                setEnv((p) => p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
+                setVariables((p) => p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
               }
             />
             <input
               className="input"
-              placeholder={row.secret ? "secret value" : "value"}
-              type={row.secret ? "password" : "text"}
+              placeholder="value"
               value={row.value}
               onChange={(e) =>
-                setEnv((p) => p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
+                setVariables((p) =>
+                  p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
+                )
               }
             />
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={row.secret}
-                onChange={(e) =>
-                  setEnv((p) => p.map((r, j) => (j === i ? { ...r, secret: e.target.checked } : r)))
-                }
-              />
-              secret
-            </label>
             <button
               type="button"
               className="btn btn--sm"
-              onClick={() => setEnv((p) => p.filter((_, j) => j !== i))}
+              onClick={() => setVariables((p) => p.filter((_, j) => j !== i))}
             >
               Remove
             </button>
@@ -413,16 +476,65 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
           <button
             type="button"
             className="btn btn--sm"
-            onClick={() => setEnv((p) => [...p, emptyEnv()])}
+            onClick={() => setVariables((p) => [...p, { name: "", value: "" }])}
           >
             + Add variable
           </button>
         </div>
-      </section>
+      </div>
+
+      {/* ---- Secrets (secret env) ---- */}
+      <div className="form-panel stack" hidden={tab !== "secrets"}>
+        <p className="field__hint">
+          Secret environment variables, stored in a Kubernetes Secret and never shown after saving.
+          {isEdit && " Leave a value blank to keep the stored secret."}
+        </p>
+        {secrets.map((row, i) => (
+          <div key={i} className="kv-row">
+            <input
+              className="input"
+              placeholder="NAME"
+              value={row.name}
+              onChange={(e) =>
+                setSecrets((p) => p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
+              }
+            />
+            <input
+              className="input"
+              type="password"
+              placeholder={row.existing ? "•••• stored — blank keeps it" : "secret value"}
+              value={row.value}
+              autoComplete="off"
+              onChange={(e) =>
+                setSecrets((p) => p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
+              }
+            />
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={() => setSecrets((p) => p.filter((_, j) => j !== i))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        <div>
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={() => setSecrets((p) => [...p, { name: "", value: "", existing: false }])}
+          >
+            + Add secret
+          </button>
+        </div>
+      </div>
 
       {/* ---- Files ---- */}
-      <section className="stack">
-        <h3 className="section-title">Mounted files</h3>
+      <div className="form-panel stack" hidden={tab !== "files"}>
+        <p className="field__hint">
+          Files mounted into the workload. Mark a file secret to store it in a Secret.
+          {isEdit && " Leave a secret file's content blank to keep the stored content."}
+        </p>
         {files.map((row, i) => (
           <div key={i} className="file-editor">
             <div className="kv-row">
@@ -470,7 +582,13 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
             </div>
             <textarea
               className="input textarea"
-              placeholder={row.secret ? "secret file content" : "file content"}
+              placeholder={
+                row.secret && row.existing
+                  ? "blank keeps the stored content"
+                  : row.secret
+                    ? "secret file content"
+                    : "file content"
+              }
               rows={3}
               value={row.content}
               onChange={(e) =>
@@ -483,15 +601,64 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
           <button
             type="button"
             className="btn btn--sm"
-            onClick={() => setFiles((p) => [...p, emptyFile()])}
+            onClick={() =>
+              setFiles((p) => [
+                ...p,
+                { mountPath: "", content: "", secret: false, readOnly: true, existing: false },
+              ])
+            }
           >
             + Add file
           </button>
         </div>
-      </section>
+      </div>
 
-      {/* ---- Scaling ---- */}
-      <section className="stack">
+      {/* ---- Advanced (placement + scaling) ---- */}
+      <div className="form-panel stack" hidden={tab !== "advanced"}>
+        <h3 className="section-title">Placement</h3>
+        <div className="field-row">
+          <label className="field">
+            <span className="field__label">Size</span>
+            <select className="input" value={size} onChange={(e) => setSize(e.target.value)}>
+              {sizes.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field__label">Custom hostname (optional)</span>
+            <input
+              className="input"
+              value={hostname}
+              onChange={(e) => setHostname(e.target.value)}
+              placeholder="defaults to the generated host"
+            />
+          </label>
+        </div>
+        {mode === "create" && info.sites.length > 0 && (
+          <div className="field">
+            <span className="field__label">Sites (none selected = all)</span>
+            <div className="checks">
+              {info.sites.map((s) => (
+                <label key={s} className="check">
+                  <input
+                    type="checkbox"
+                    checked={sites.includes(s)}
+                    onChange={(e) =>
+                      setSites((prev) =>
+                        e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
+                      )
+                    }
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <h3 className="section-title">Autoscaling</h3>
         <div className="field-row">
           <label className="field">
@@ -549,7 +716,7 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
         <span className="field__hint">
           cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1).
         </span>
-      </section>
+      </div>
 
       {error && (
         <div className="notice notice--error">
@@ -572,10 +739,7 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
         <button type="submit" className="btn btn--primary" disabled={pending}>
           {pending ? "Saving…" : mode === "create" ? `Create ${type}` : "Save changes"}
         </button>
-        <Link
-          className="btn"
-          href={mode === "edit" ? `/serverless/${seg}/${initial!.name}` : `/serverless/${seg}`}
-        >
+        <Link className="btn" href={cancelHref}>
           Cancel
         </Link>
       </div>

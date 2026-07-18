@@ -1024,3 +1024,33 @@ code {
   color: var(--red-600);
   font-size: 12px;
 }
+
+/* Form section tabs (in-page, state-driven, not URL) */
+.form-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.form-tab {
+  padding: 10px 16px;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+.form-tab:hover {
+  color: var(--text);
+}
+.form-tab--active {
+  color: var(--blue-600);
+  border-bottom-color: var(--blue-600);
+}
+.form-panel {
+  animation: none;
+}

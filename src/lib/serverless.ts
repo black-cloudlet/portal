@@ -156,13 +156,18 @@ export interface ScalingInput {
 
 export interface EnvVarInput {
   name: string;
-  value: string;
+  // Keep-on-write: a secret var sent with value null/omitted keeps the stored
+  // value on update. A non-secret var always needs a value; a brand-new secret
+  // needs one too. Send a value to set/change it.
+  value?: string | null;
   secret: boolean;
 }
 
 export interface FileInput {
   mountPath: string;
-  content: string;
+  // Keep-on-write: a secret file sent with content null/omitted keeps the
+  // stored content on update. A non-secret file always needs content.
+  content?: string | null;
   secret: boolean;
   readOnly: boolean;
 }

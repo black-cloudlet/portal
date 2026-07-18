@@ -16,7 +16,7 @@ import { getServerlessContext } from "@/lib/serverless-context";
 
 /** Statuses that are still settling; while in one of these we auto-refresh. */
 const PENDING_STATUSES = new Set(["Pending", "Deploying", "Terminating"]);
-const TAB_IDS: DetailTab[] = ["status", "config", "scaling", "logs"];
+const TAB_IDS: DetailTab[] = ["status", "variables", "secrets", "files", "advanced", "logs"];
 
 /** Show the API's naive local timestamp as-is (no timezone math). */
 function fmtDate(v: string | null | undefined): string {
@@ -29,8 +29,8 @@ function fmtDate(v: string | null | undefined): string {
 
 /**
  * The workload detail view: a header with status and Edit/Delete actions, a
- * metadata strip, and the Status / Config / Scaling / Logs tabs. Server-rendered
- * per request; auto-refreshes while the workload is still deploying.
+ * metadata strip, and the Status / Variables / Secrets / Files / Advanced / Logs
+ * tabs. Server-rendered per request; auto-refreshes while still deploying.
  */
 export default async function WorkloadDetail({
   type,
@@ -120,8 +120,10 @@ export default async function WorkloadDetail({
       <WorkloadDetailTabs active={activeTab} />
 
       {activeTab === "status" && <StatusPanel wl={wl} />}
-      {activeTab === "config" && <ConfigPanel wl={wl} />}
-      {activeTab === "scaling" && <ScalingPanel wl={wl} />}
+      {activeTab === "variables" && <VariablesPanel wl={wl} />}
+      {activeTab === "secrets" && <SecretsPanel wl={wl} />}
+      {activeTab === "files" && <FilesPanel wl={wl} />}
+      {activeTab === "advanced" && <AdvancedPanel wl={wl} />}
       {activeTab === "logs" && (
         <LogsPanel type={type} group={activeGroup} name={name} accessToken={accessToken} />
       )}
@@ -129,41 +131,8 @@ export default async function WorkloadDetail({
   );
 }
 
-/** Per-site deploy/health status and any error. */
+/** Source (image/git) plus per-site deploy/health status and any error. */
 function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
-  if (wl.sites.length === 0) {
-    return <div className="notice">No per-site status yet.</div>;
-  }
-  return (
-    <div className="table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Site</th>
-            <th>Status</th>
-            <th>Revision</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          {wl.sites.map((s) => (
-            <tr key={s.site}>
-              <td>{s.site}</td>
-              <td>
-                <StatusPill status={s.status} />
-              </td>
-              <td>{s.revision ?? "—"}</td>
-              <td>{s.error ? <span className="text-error">{s.error}</span> : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Source (image/git), environment variables, and mounted files. */
-function ConfigPanel({ wl }: { wl: WorkloadDetailData }) {
   return (
     <div className="stack">
       <section>
@@ -200,29 +169,29 @@ function ConfigPanel({ wl }: { wl: WorkloadDetailData }) {
       </section>
 
       <section>
-        <h3 className="section-title">Environment</h3>
-        {wl.env.length === 0 ? (
-          <div className="notice">No environment variables.</div>
+        <h3 className="section-title">Sites</h3>
+        {wl.sites.length === 0 ? (
+          <div className="notice">No per-site status yet.</div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Value</th>
+                  <th>Site</th>
+                  <th>Status</th>
+                  <th>Revision</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
-                {wl.env.map((e) => (
-                  <tr key={e.name}>
-                    <td className="table__name">{e.name}</td>
+                {wl.sites.map((s) => (
+                  <tr key={s.site}>
+                    <td>{s.site}</td>
                     <td>
-                      {e.secret ? (
-                        <span className="pill pill--muted">secret</span>
-                      ) : (
-                        <code>{e.value}</code>
-                      )}
+                      <StatusPill status={s.status} />
                     </td>
+                    <td>{s.revision ?? "—"}</td>
+                    <td>{s.error ? <span className="text-error">{s.error}</span> : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -230,42 +199,95 @@ function ConfigPanel({ wl }: { wl: WorkloadDetailData }) {
           </div>
         )}
       </section>
+    </div>
+  );
+}
 
-      <section>
-        <h3 className="section-title">Files</h3>
-        {wl.files.length === 0 ? (
-          <div className="notice">No mounted files.</div>
-        ) : (
-          <div className="stack">
-            {wl.files.map((f) => (
-              <div key={f.mountPath} className="file-card">
-                <div className="file-card__head">
-                  <code>{f.mountPath}</code>
-                  <span className="file-card__tags">
-                    {f.secret && <span className="pill pill--muted">secret</span>}
-                    <span className="pill pill--muted">
-                      {f.readOnly ? "read-only" : "read-write"}
-                    </span>
-                  </span>
-                </div>
-                {f.secret ? (
-                  <p className="text-muted">Secret content is not shown.</p>
-                ) : f.content != null ? (
-                  <pre className="code-block">{f.content}</pre>
-                ) : (
-                  <p className="text-muted">No content.</p>
-                )}
-              </div>
-            ))}
+/** Non-secret environment variables. */
+function VariablesPanel({ wl }: { wl: WorkloadDetailData }) {
+  const vars = wl.env.filter((e) => !e.secret);
+  if (vars.length === 0) return <div className="notice">No environment variables.</div>;
+  return (
+    <div className="table-wrap">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vars.map((e) => (
+            <tr key={e.name}>
+              <td className="table__name">{e.name}</td>
+              <td>
+                <code>{e.value}</code>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Secret environment variables (names only; values are never returned). */
+function SecretsPanel({ wl }: { wl: WorkloadDetailData }) {
+  const secretVars = wl.env.filter((e) => e.secret);
+  if (secretVars.length === 0) return <div className="notice">No secrets.</div>;
+  return (
+    <div className="table-wrap">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {secretVars.map((e) => (
+            <tr key={e.name}>
+              <td className="table__name">{e.name}</td>
+              <td>
+                <span className="pill pill--muted">secret set</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Mounted files (secret and non-secret); secret contents are redacted. */
+function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
+  if (wl.files.length === 0) return <div className="notice">No mounted files.</div>;
+  return (
+    <div className="stack">
+      {wl.files.map((f) => (
+        <div key={f.mountPath} className="file-card">
+          <div className="file-card__head">
+            <code>{f.mountPath}</code>
+            <span className="file-card__tags">
+              {f.secret && <span className="pill pill--muted">secret</span>}
+              <span className="pill pill--muted">{f.readOnly ? "read-only" : "read-write"}</span>
+            </span>
           </div>
-        )}
-      </section>
+          {f.secret ? (
+            <p className="text-muted">Secret content is not shown.</p>
+          ) : f.content != null ? (
+            <pre className="code-block">{f.content}</pre>
+          ) : (
+            <p className="text-muted">No content.</p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
 /** Desired autoscaling and current per-site replicas / live usage. */
-function ScalingPanel({ wl }: { wl: WorkloadDetailData }) {
+function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
   const sc = wl.scaling;
   return (
     <div className="stack">

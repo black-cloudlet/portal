@@ -5,8 +5,10 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 const TABS = [
   { id: "status", label: "Status" },
-  { id: "config", label: "Config" },
-  { id: "scaling", label: "Scaling" },
+  { id: "variables", label: "Variables" },
+  { id: "secrets", label: "Secrets" },
+  { id: "files", label: "Files" },
+  { id: "advanced", label: "Advanced" },
   { id: "logs", label: "Logs" },
 ] as const;
 
