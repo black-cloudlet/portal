@@ -3,6 +3,7 @@ import Link from "next/link";
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import AutoRefresh from "@/components/AutoRefresh";
 import DeleteWorkloadButton from "@/components/DeleteWorkloadButton";
+import LogsToolbar from "@/components/LogsToolbar";
 import StatusPill from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import {
@@ -36,10 +37,12 @@ export default async function WorkloadDetail({
   type,
   name,
   tab,
+  container,
 }: {
   type: WorkloadType;
   name: string;
   tab?: string;
+  container?: string;
 }) {
   const { enabled, activeGroup, accessToken } = await getServerlessContext();
   const seg = typeSegment(type);
@@ -125,7 +128,13 @@ export default async function WorkloadDetail({
       {activeTab === "files" && <FilesPanel wl={wl} />}
       {activeTab === "advanced" && <AdvancedPanel wl={wl} />}
       {activeTab === "logs" && (
-        <LogsPanel type={type} group={activeGroup} name={name} accessToken={accessToken} />
+        <LogsPanel
+          type={type}
+          group={activeGroup}
+          name={name}
+          accessToken={accessToken}
+          container={container}
+        />
       )}
     </div>
   );
@@ -360,20 +369,28 @@ async function LogsPanel({
   group,
   name,
   accessToken,
+  container,
 }: {
   type: WorkloadType;
   group: string;
   name: string;
   accessToken?: string;
+  container?: string;
 }) {
   let logs;
   try {
-    logs = await getWorkloadLogs(type, group, name, accessToken);
+    logs = await getWorkloadLogs(type, group, name, accessToken, { container });
   } catch (err) {
-    return <ApiErrorNotice error={err} />;
+    return (
+      <div className="stack">
+        <LogsToolbar container={container ?? "user-container"} />
+        <ApiErrorNotice error={err} />
+      </div>
+    );
   }
   return (
     <div className="stack">
+      <LogsToolbar container={container ?? "user-container"} />
       <p className="text-muted">
         Point-in-time snapshot from site <strong>{logs.site}</strong>. A scaled-to-zero workload has
         no pods.

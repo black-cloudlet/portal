@@ -12,9 +12,9 @@ export default async function ContainerDetailPage({
   searchParams,
 }: {
   params: Promise<{ name: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; container?: string }>;
 }) {
   const { name } = await params;
-  const { tab } = await searchParams;
-  return <WorkloadDetail type="container" name={name} tab={tab} />;
+  const { tab, container } = await searchParams;
+  return <WorkloadDetail type="container" name={name} tab={tab} container={container} />;
 }

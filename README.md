@@ -27,9 +27,22 @@ trusts - so one login works across every offering, and group names are
   not-yet-available ones show as _Coming soon_.
 - **Serverless section with tabs.** GCP Compute–style sub-navigation: a
   **Functions** tab and a **Containers** tab, each listing the active group's
-  workloads of that type from the Serverless API. A shared header shows the
-  platform capabilities from the public `/info` endpoint. New workload types are
-  added as more tabs.
+  workloads of that type from the Serverless API (sortable by name or creation
+  time). A shared header shows the platform capabilities from the public `/info`
+  endpoint. New workload types are added as more tabs.
+- **Workload detail view.** Each row opens a per-workload page with
+  sub-tabs - **Status** (source + per-site deploy state and errors),
+  **Variables** and **Secrets** (env, secrets redacted), **Files**,
+  **Advanced** (autoscaling + live per-site replicas/usage), and **Logs**
+  (a pod-log snapshot with a container picker and refresh). It auto-refreshes
+  while a workload is still deploying.
+- **Create, edit, and delete.** A tabbed form (General / Variables / Secrets /
+  Files / Advanced) driven by the `/info` capabilities creates and edits
+  workloads; delete confirms first. Writes go through server actions that
+  forward the SSO token and re-resolve the active group server-side. Edits
+  follow the API's keep-on-write contract - a secret left blank keeps its
+  stored value, the function git token is sent only to rotate, and the
+  container registry token is kept when the username is echoed without one.
 
 ## Group normalization
 
@@ -67,18 +80,21 @@ src/
   auth.ts             SSO/OIDC (Auth.js + Keycloak): tokens, refresh, groups
   middleware.ts       route gate (everything but /login + /api/auth is protected)
   lib/                groups (ported normalization), config, service catalog,
-                      active-group cookie, Serverless API client
+                      active-group cookie, Serverless API client, workload-spec
+                      (keep-on-write env/files mapping)
   app/
     login/            SSO sign-in landing
     (console)/        the shell: top bar (group switcher + profile) + side nav
       dashboard/      service cards
       serverless/     offering shell + Functions/Containers tabs
-        functions/    functions for the active group
-        containers/   containers for the active group
+        actions.ts    create/update/delete server actions (token forwarding)
+        functions/    list, [name] detail, [name]/edit, new
+        containers/   list, [name] detail, [name]/edit, new
       profile/        full account detail
     api/              Auth.js endpoints, active-group setter, health probe
   components/         TopBar, GroupSwitcher, ProfileMenu, SideNav, ServerlessTabs,
-                      WorkloadTable
+                      WorkloadTable, WorkloadDetail(+Tabs), WorkloadForm,
+                      DeleteWorkloadButton, LogsToolbar, AutoRefresh, StatusPill
 charts/portal/        Helm chart (Deployment, Service, Route, ExternalSecret,
                       NetworkPolicy)
 .github/workflows/    CI/CD: checks (reusable), ci, release

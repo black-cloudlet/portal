@@ -1054,3 +1054,14 @@ code {
 .form-panel {
   animation: none;
 }
+
+/* Logs tab controls */
+.logs-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.logs-toolbar .input {
+  width: auto;
+  flex: 0 1 240px;
+}

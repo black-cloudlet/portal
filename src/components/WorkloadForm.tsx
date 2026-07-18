@@ -11,8 +11,6 @@ import {
 import type {
   ContainerCreateInput,
   ContainerUpdateInput,
-  EnvVarInput,
-  FileInput,
   FunctionCreateInput,
   FunctionUpdateInput,
   PlatformInfo,
@@ -20,6 +18,14 @@ import type {
   WorkloadDetail,
   WorkloadType,
 } from "@/lib/serverless";
+import {
+  buildEnvList,
+  buildFileList,
+  RESERVED_WORKLOAD_NAMES,
+  type EnvRow,
+  type FileRow,
+  type SecretRow,
+} from "@/lib/workload-spec";
 
 type Mode = "create" | "edit";
 
@@ -39,23 +45,6 @@ const FORM_TABS = [
   { id: "advanced", label: "Advanced" },
 ] as const;
 type FormTab = (typeof FORM_TABS)[number]["id"];
-
-interface VarRow {
-  name: string;
-  value: string;
-}
-interface SecretRow {
-  name: string;
-  value: string;
-  existing: boolean;
-}
-interface FileRow {
-  mountPath: string;
-  content: string;
-  secret: boolean;
-  readOnly: boolean;
-  existing: boolean;
-}
 
 /**
  * Create or edit a function/container, organized into tabs (General, Variables,
@@ -87,7 +76,7 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
   const [registryToken, setRegistryToken] = useState("");
 
   // Variables (non-secret env) and Secrets (secret env) as separate lists.
-  const [variables, setVariables] = useState<VarRow[]>(
+  const [variables, setVariables] = useState<EnvRow[]>(
     initial?.env.filter((e) => !e.secret).map((e) => ({ name: e.name, value: e.value ?? "" })) ??
       [],
   );
@@ -108,7 +97,9 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
 
   // Advanced: placement + scaling
   const [size, setSize] = useState(initial?.size ?? sizes[0]);
-  const [hostname, setHostname] = useState("");
+  // Prefill the effective host on edit so saving doesn't reset a custom hostname
+  // (PUT is a full replace; a blank hostname would recompute the default).
+  const [hostname, setHostname] = useState(initial?.hostname ?? "");
   const [sites, setSites] = useState<string[]>([]);
   const initScale = initial?.scaling;
   const [metric, setMetric] = useState(initScale?.metric ?? defaultMetric);
@@ -130,50 +121,12 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
     };
   }
 
-  /** Merge Variables + Secrets into the API env list, applying keep-on-write. */
-  function buildEnv(): EnvVarInput[] {
-    const out: EnvVarInput[] = [];
-    for (const v of variables) {
-      if (v.name.trim() === "") continue;
-      out.push({ name: v.name.trim(), value: v.value, secret: false });
-    }
-    for (const s of secrets) {
-      const n = s.name.trim();
-      if (n === "") continue;
-      if (s.value.trim() !== "") {
-        out.push({ name: n, value: s.value, secret: true }); // set / change
-      } else if (isEdit && s.existing) {
-        out.push({ name: n, secret: true, value: null }); // keep stored
-      } else {
-        out.push({ name: n, value: "", secret: true }); // new secret (validated below)
-      }
-    }
-    return out;
-  }
-
-  function buildFiles(): FileInput[] {
-    const out: FileInput[] = [];
-    for (const f of files) {
-      const mp = f.mountPath.trim();
-      if (mp === "") continue;
-      const base = { mountPath: mp, secret: f.secret, readOnly: f.readOnly };
-      if (f.secret) {
-        if (f.content.trim() !== "")
-          out.push({ ...base, content: f.content }); // set / change
-        else if (isEdit && f.existing)
-          out.push(base); // keep stored (content omitted)
-        else out.push({ ...base, content: "" }); // new secret file (validated below)
-      } else {
-        out.push({ ...base, content: f.content }); // non-secret always carries content
-      }
-    }
-    return out;
-  }
-
   /** Client-side checks that mirror the API's required fields. */
   function validate(): { tab: FormTab; message: string } | null {
     if (mode === "create" && name.trim() === "")
       return { tab: "general", message: "Name is required." };
+    if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
+      return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
     if (isFn) {
       if (mode === "create") {
         if (gitRepo.trim() === "")
@@ -223,8 +176,8 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
     }
 
     const common = {
-      env: buildEnv(),
-      files: buildFiles(),
+      env: buildEnvList(variables, secrets, isEdit),
+      files: buildFileList(files, isEdit),
       scaling: buildScaling(),
       size,
       hostname: hostname.trim() === "" ? null : hostname.trim(),
