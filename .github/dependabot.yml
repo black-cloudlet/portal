@@ -9,6 +9,13 @@ updates:
     groups:
       npm-deps:
         patterns: ["*"]
+    # A framework major (Next.js) needs a hand-driven migration, so keep it out
+    # of the automated group sweep; the bot still proposes minors/patches.
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions - keeps the SHA-pinned actions current (updates the pin and
   # the version comment together).
@@ -20,8 +27,14 @@ updates:
       actions:
         patterns: ["*"]
 
-  # Base image in the Dockerfile.
+  # Base image in the Dockerfile. The Node major is a single source of truth
+  # shared with package.json `engines.node` (enforced by the CI `version` job),
+  # so a major bump needs both files changed together - keep it manual and let
+  # the bot handle only minor/patch of the base image.
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
