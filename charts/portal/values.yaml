@@ -14,7 +14,15 @@ image:
 
 replicaCount: 2
 
-namespace: portal
+# The portal's Namespace. `name` is used by every resource in the chart. The
+# chart also creates the Namespace object (set `create: false` when it is
+# provisioned out of band); `labels`/`annotations` are merged onto the standard
+# chart labels on it.
+namespace:
+  name: portal
+  create: true
+  labels: {}
+  annotations: {}
 
 # Public URL the browser reaches the portal at. Defaults to the Route host
 # (portal.{global.baseDomain}); OIDC redirect URIs are derived from it.
@@ -38,6 +46,8 @@ sso:
 # The service offerings the console fronts and the address of each backing API.
 # `serverlessApiUrl` wires the Serverless offering; add more as their APIs land.
 # `servicesJson`, when set, overrides/extends the whole catalog (see lib/services).
+# `serverlessApiUrl` is rendered through Helm `tpl`, so it may reference other
+# values, e.g. "https://serverless-api.{{ .Values.global.baseDomain }}".
 services:
   serverlessApiUrl: https://serverless-api.example.com
   servicesJson: ""
@@ -72,6 +82,9 @@ service:
 
 # The OpenShift Route exposing the portal. host defaults to
 # portal.{global.baseDomain}; labels/annotations are merged onto the Route.
+# host is rendered through Helm `tpl`, so it may reference other values, e.g.
+# "portal.{{ .Values.global.baseDomain }}" (the AUTH_URL/OIDC redirect base is
+# derived from the same host).
 route:
   host: ""
   labels: {}
