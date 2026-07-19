@@ -14,13 +14,13 @@ image:
 
 replicaCount: 2
 
-namespace: portal
-
-# The chart creates the portal Namespace. Set `enabled: false` when it is
-# provisioned out of band. `labels`/`annotations` are merged onto the standard
-# chart labels on the Namespace object.
-createNamespace:
-  enabled: true
+# The portal's Namespace. `name` is used by every resource in the chart. The
+# chart also creates the Namespace object (set `create: false` when it is
+# provisioned out of band); `labels`/`annotations` are merged onto the standard
+# chart labels on it.
+namespace:
+  name: portal
+  create: true
   labels: {}
   annotations: {}
 
