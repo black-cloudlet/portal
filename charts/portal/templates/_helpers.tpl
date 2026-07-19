@@ -23,13 +23,14 @@ leaves it "latest" on main). An optional ``image.registry`` is prefixed when set
 {{/*
 The portal's public URL (Auth.js AUTH_URL / OIDC redirect base). Explicit
 ``publicUrl`` wins; otherwise it is https:// the Route host, which itself
-defaults to portal.{global.baseDomain}.
+defaults to portal.{global.baseDomain}. Both are rendered through ``tpl`` so
+they may reference other values, and the host stays in sync with route.yaml.
 */}}
 {{- define "portal.publicUrl" -}}
 {{- if .Values.publicUrl -}}
-{{ .Values.publicUrl }}
+{{ tpl .Values.publicUrl . }}
 {{- else -}}
 {{- $host := .Values.route.host | default (printf "portal.%s" .Values.global.baseDomain) -}}
-https://{{ $host }}
+https://{{ tpl $host . }}
 {{- end -}}
 {{- end -}}

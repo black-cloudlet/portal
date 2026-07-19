@@ -46,7 +46,7 @@ spec:
             - name: PORTAL_ORG_NAME
               value: {{ .Values.branding.organization | quote }}
             - name: PORTAL_SERVERLESS_API_URL
-              value: {{ .Values.services.serverlessApiUrl | quote }}
+              value: {{ tpl .Values.services.serverlessApiUrl . | quote }}
             {{- with .Values.services.servicesJson }}
             - name: PORTAL_SERVICES
               value: {{ . | quote }}
