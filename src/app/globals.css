@@ -15,8 +15,9 @@
   --green-50: #e6f4ea;
   --red-600: #d93025;
   --red-50: #fce8e6;
-  --yellow-700: #b06000;
-  --yellow-50: #fef7e0;
+  /* Caution accent: a muted gold (not orange), used sparingly for warnings. */
+  --yellow-700: #7d6a00;
+  --yellow-50: #fbf6d9;
 
   --bg: #f1f3f4;
   --surface: #ffffff;
@@ -525,6 +526,40 @@ code {
   flex: 1;
 }
 
+/* A service row with a collapsible sub-list: the link plus its caret toggle. */
+.sidenav__parent {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sidenav__parent .sidenav__item {
+  flex: 1;
+  padding-right: 40px;
+}
+.sidenav__toggle {
+  position: absolute;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sidenav__toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sidenav__chevron {
+  transition: transform 0.15s ease;
+}
+.sidenav__chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
 /* Nested sub-sections under a service (e.g. Serverless > Containers / Functions). */
 .sidenav__sub {
   display: flex;
@@ -644,9 +679,9 @@ code {
   text-transform: capitalize;
 }
 .tag--soon {
-  background: var(--yellow-50);
-  color: var(--yellow-700);
-  border-color: transparent;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 .pill {
   display: inline-block;
