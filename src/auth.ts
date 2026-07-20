@@ -21,9 +21,10 @@ import { normalizeGroups } from "@/lib/groups";
 
 /**
  * Decode the claims (payload) of a JWT without verifying its signature. Used to
- * read claims the SSO puts in the *access* token but not the ID token/userinfo.
- * The token was just minted by our own OIDC exchange, so no verification is
- * needed here - we only read it. Returns {} for anything unparseable.
+ * read claims (e.g. groups) directly from the ID and access tokens, which the
+ * OIDC `profile` object doesn't always surface. The tokens were just minted by
+ * our own OIDC exchange, so no verification is needed here - we only read them.
+ * Returns {} for anything unparseable.
  */
 function decodeJwtClaims(jwt: string | undefined): Record<string, unknown> {
   if (!jwt) return {};
@@ -44,6 +45,26 @@ function claimGroups(claims: Record<string, unknown>, claim: string): string[] {
   if (Array.isArray(value)) return value.map(String);
   if (typeof value === "string" && value.length > 0) return [value];
   return [];
+}
+
+/**
+ * Resolve the user's normalized groups from every place the SSO might carry
+ * them: the OIDC `profile` (userinfo/ID-token claims the provider surfaces), the
+ * raw ID token, and the access token. Keycloak group mappers are per-client and
+ * per-token, so a given deployment may emit `groups` in only one of these - we
+ * read all three and merge so the portal never misses a membership the token
+ * actually carries.
+ */
+function resolveGroups(
+  profileClaims: Record<string, unknown>,
+  idClaims: Record<string, unknown>,
+  accessClaims: Record<string, unknown>,
+): string[] {
+  return normalizeGroups([
+    ...claimGroups(profileClaims, oidc.groupsClaim),
+    ...claimGroups(idClaims, oidc.groupsClaim),
+    ...claimGroups(accessClaims, oidc.groupsClaim),
+  ]);
 }
 
 /** Refresh the access token via the Keycloak token endpoint (rotation). */
@@ -84,6 +105,9 @@ export const authConfig: NextAuthConfig = {
       issuer: oidc.issuer,
       clientId: oidc.clientId,
       clientSecret: oidc.clientSecret,
+      // Some realms only emit the groups claim when a dedicated scope is asked
+      // for; PORTAL_OIDC_SCOPES makes the requested scopes configurable.
+      authorization: { params: { scope: oidc.scopes } },
     }),
   ],
   session: { strategy: "jwt" },
@@ -96,15 +120,25 @@ export const authConfig: NextAuthConfig = {
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
         const claims = (profile ?? {}) as Record<string, unknown>;
-        // Keycloak (like the Serverless API) commonly carries `groups` in the
-        // access token rather than the ID token / userinfo. Read both and merge,
-        // so the portal sees the same membership the downstream API authorizes
-        // against instead of showing "no group membership".
+        const idClaims = decodeJwtClaims(account.id_token);
         const accessClaims = decodeJwtClaims(account.access_token);
-        token.groups = normalizeGroups([
-          ...claimGroups(claims, oidc.groupsClaim),
-          ...claimGroups(accessClaims, oidc.groupsClaim),
-        ]);
+        token.groups = resolveGroups(claims, idClaims, accessClaims);
+
+        if (oidc.debug) {
+          const keys = (c: Record<string, unknown>) => Object.keys(c).sort();
+          // Group names are not secrets; claim *keys* help locate the mapper.
+          console.info("[portal oidc] groups claim name:", oidc.groupsClaim);
+          console.info("[portal oidc] profile claim keys:", keys(claims));
+          console.info("[portal oidc] id_token claim keys:", keys(idClaims));
+          console.info("[portal oidc] access_token claim keys:", keys(accessClaims));
+          console.info("[portal oidc] raw groups", {
+            profile: claims[oidc.groupsClaim],
+            idToken: idClaims[oidc.groupsClaim],
+            accessToken: accessClaims[oidc.groupsClaim],
+          });
+          console.info("[portal oidc] normalized groups:", token.groups);
+        }
+
         token.username =
           (claims.preferred_username as string) ?? (claims.email as string) ?? token.sub ?? "";
         token.name = (claims.name as string) ?? token.name;
