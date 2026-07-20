@@ -8,9 +8,9 @@
  */
 
 :root {
-  --blue-600: #1a73e8; /* Google blue (primary) */
-  --blue-700: #1557b0;
-  --blue-50: #e8f0fe;
+  --blue-600: #0f766e; /* teal (primary accent) */
+  --blue-700: #115e59;
+  --blue-50: #d8f0ec;
   --green-600: #188038;
   --green-50: #e6f4ea;
   --red-600: #d93025;
@@ -44,9 +44,9 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --blue-600: #8ab4f8;
-    --blue-700: #aecbfa;
-    --blue-50: #1f2a3d;
+    --blue-600: #2dd4bf;
+    --blue-700: #5eead4;
+    --blue-50: #123531;
     --green-600: #81c995;
     --green-50: #1e2f22;
     --red-600: #f28b82;
@@ -66,9 +66,9 @@
 }
 
 :root[data-theme="dark"] {
-  --blue-600: #8ab4f8;
-  --blue-700: #aecbfa;
-  --blue-50: #1f2a3d;
+  --blue-600: #2dd4bf;
+  --blue-700: #5eead4;
+  --blue-50: #123531;
   --green-600: #81c995;
   --green-50: #1e2f22;
   --red-600: #f28b82;
@@ -642,7 +642,7 @@ code {
 .card--link:hover {
   text-decoration: none;
   border-color: var(--blue-600);
-  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.4);
+  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.4);
 }
 .card--disabled {
   opacity: 0.6;
