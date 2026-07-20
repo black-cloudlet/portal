@@ -18,7 +18,7 @@ export interface ServiceDef {
   name: string;
   /** One-line description for the dashboard card. */
   description: string;
-  /** Emoji glyph placeholder (kept inline; airgap-friendly, no icon CDN). */
+  /** Inline SVG icon name (see components/Icon.tsx); airgap-friendly, no CDN. */
   icon: string;
   /** Nav grouping header, e.g. "Serverless", "Compute". */
   category: string;
@@ -26,6 +26,11 @@ export interface ServiceDef {
   apiBaseUrl: string;
   /** Whether the offering is live. Disabled services render as "Coming soon". */
   enabled: boolean;
+  /**
+   * Optional left-nav sub-sections, shown nested under the service when it is
+   * live (GCP-style). Each maps to `/<service id>/<sub id>`.
+   */
+  subItems?: { id: string; name: string }[];
 }
 
 /** Built-in catalog. Addresses come from env; unset -> disabled ("Coming soon"). */
@@ -35,17 +40,21 @@ function defaultCatalog(): ServiceDef[] {
       id: "serverless",
       name: "Serverless",
       description: "Deploy functions and containers on Knative with autoscaling and scale-to-zero.",
-      icon: "⚡", // high voltage
+      icon: "bolt",
       category: "Serverless",
       apiBaseUrl: stripSlash(process.env.PORTAL_SERVERLESS_API_URL ?? ""),
       enabled: Boolean(process.env.PORTAL_SERVERLESS_API_URL),
+      subItems: [
+        { id: "containers", name: "Containers" },
+        { id: "functions", name: "Functions" },
+      ],
     },
     // Future offerings register here (or via PORTAL_SERVICES) as their APIs land.
     {
       id: "storage",
       name: "Object Storage",
       description: "Buckets and objects for your group. Coming soon.",
-      icon: "🗄️", // card index dividers
+      icon: "database",
       category: "Storage",
       apiBaseUrl: stripSlash(process.env.PORTAL_STORAGE_API_URL ?? ""),
       enabled: Boolean(process.env.PORTAL_STORAGE_API_URL),
@@ -83,12 +92,13 @@ export function getServices(): ServiceDef[] {
       id: o.id,
       name: o.name ?? existing?.name ?? o.id,
       description: o.description ?? existing?.description ?? "",
-      icon: o.icon ?? existing?.icon ?? "🧩", // puzzle piece
+      icon: o.icon ?? existing?.icon ?? "cube",
       category: o.category ?? existing?.category ?? "Other",
       apiBaseUrl: stripSlash(o.apiBaseUrl ?? existing?.apiBaseUrl ?? ""),
       // An override may enable/disable explicitly; otherwise a service is
       // enabled once it has an address.
       enabled: o.enabled ?? Boolean(o.apiBaseUrl ?? existing?.apiBaseUrl),
+      subItems: o.subItems ?? existing?.subItems,
     };
     byId.set(o.id, merged);
   }

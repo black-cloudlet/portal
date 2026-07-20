@@ -3,7 +3,8 @@
  * Cloud console: a slim top app bar, a left navigation rail, and content built
  * from flat cards and tables. Self-contained (no external fonts or CSS CDNs) so
  * it runs unchanged in the airgapped environment. Light and dark themes follow
- * the OS preference.
+ * the OS preference by default; the top-bar toggle can force a light ("bright")
+ * or dark theme via `data-theme` on <html> (see below and ThemeToggle).
  */
 
 :root {
@@ -23,6 +24,8 @@
   --border: #dadce0;
   --text: #202124;
   --text-muted: #5f6368;
+  /* Text/foreground color that sits on a filled primary (blue) surface. */
+  --on-primary: #ffffff;
   --topbar-h: 56px;
   --sidenav-w: 260px;
   --radius: 8px;
@@ -31,8 +34,15 @@
   --font: "Google Sans", "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 
+/*
+ * Dark theme. Applied when the OS prefers dark AND the user hasn't forced a
+ * light ("bright") theme, or whenever the user explicitly selects dark. The
+ * ThemeToggle sets `data-theme` on <html>; `:root[data-theme="light"]` keeps
+ * the light defaults above even on a dark OS. The two selectors below carry
+ * identical variables (CSS has no shared block).
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --blue-600: #8ab4f8;
     --blue-700: #aecbfa;
     --blue-50: #1f2a3d;
@@ -49,8 +59,30 @@
     --border: #3c4043;
     --text: #e8eaed;
     --text-muted: #9aa0a6;
+    --on-primary: #202124;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 1px 3px 1px rgba(0, 0, 0, 0.4);
   }
+}
+
+:root[data-theme="dark"] {
+  --blue-600: #8ab4f8;
+  --blue-700: #aecbfa;
+  --blue-50: #1f2a3d;
+  --green-600: #81c995;
+  --green-50: #1e2f22;
+  --red-600: #f28b82;
+  --red-50: #2e2321;
+  --yellow-700: #fdd663;
+  --yellow-50: #2d2a1a;
+
+  --bg: #202124;
+  --surface: #292a2d;
+  --surface-2: #35363a;
+  --border: #3c4043;
+  --text: #e8eaed;
+  --text-muted: #9aa0a6;
+  --on-primary: #202124;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 1px 3px 1px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -107,12 +139,7 @@ code {
 }
 .btn--primary {
   background: var(--blue-600);
-  color: #fff;
-}
-@media (prefers-color-scheme: dark) {
-  .btn--primary {
-    color: #202124;
-  }
+  color: var(--on-primary);
 }
 .btn--primary:hover {
   background: var(--blue-700);
@@ -204,6 +231,23 @@ code {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Icon-only top-bar control (e.g. the theme toggle). */
+.iconbtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.iconbtn:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 .topbar__brand {
   display: flex;
@@ -338,18 +382,13 @@ code {
   height: 34px;
   border-radius: 50%;
   background: var(--blue-600);
-  color: #fff;
+  color: var(--on-primary);
   border: none;
   cursor: pointer;
   font-weight: 600;
   font-size: 13px;
   display: grid;
   place-items: center;
-}
-@media (prefers-color-scheme: dark) {
-  .profile__avatar {
-    color: #202124;
-  }
 }
 .profile__avatar--lg {
   width: 48px;
@@ -477,12 +516,23 @@ code {
   background: transparent;
 }
 .sidenav__icon {
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 20px;
-  text-align: center;
 }
 .sidenav__label {
   flex: 1;
+}
+
+/* Nested sub-sections under a service (e.g. Serverless > Containers / Functions). */
+.sidenav__sub {
+  display: flex;
+  flex-direction: column;
+}
+.sidenav__item--sub {
+  padding: 8px 16px 8px 50px;
+  font-size: 13px;
 }
 
 /* ---------- Page & sections ---------- */

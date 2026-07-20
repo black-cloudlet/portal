@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import GroupSwitcher from "@/components/GroupSwitcher";
+import Icon from "@/components/Icon";
 import ProfileMenu from "@/components/ProfileMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface TopBarProps {
   productName: string;
@@ -28,7 +30,7 @@ export default function TopBar({
       <div className="topbar__left">
         <Link href="/dashboard" className="topbar__brand">
           <span className="topbar__logo" aria-hidden="true">
-            ☁️
+            <Icon name="cloud" size={22} />
           </span>
           <span className="topbar__product">
             {organization} <strong>{productName}</strong>
@@ -37,6 +39,7 @@ export default function TopBar({
         <GroupSwitcher groups={groups} activeGroup={activeGroup} />
       </div>
       <div className="topbar__right">
+        <ThemeToggle />
         <ProfileMenu user={user} activeGroup={activeGroup} groups={groups} />
       </div>
     </header>

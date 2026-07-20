@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import Icon from "@/components/Icon";
 import type { ServiceDef } from "@/lib/services";
 
 interface SideNavProps {
@@ -24,7 +25,7 @@ export default function SideNav({ categories }: SideNavProps) {
         className={`sidenav__item ${pathname === "/dashboard" ? "sidenav__item--active" : ""}`}
       >
         <span className="sidenav__icon" aria-hidden="true">
-          🏠
+          <Icon name="home" />
         </span>
         <span className="sidenav__label">Home</span>
       </Link>
@@ -43,7 +44,7 @@ export default function SideNav({ categories }: SideNavProps) {
                   title="Coming soon"
                 >
                   <span className="sidenav__icon" aria-hidden="true">
-                    {svc.icon}
+                    <Icon name={svc.icon} />
                   </span>
                   <span className="sidenav__label">{svc.name}</span>
                   <span className="tag tag--soon">Soon</span>
@@ -51,16 +52,36 @@ export default function SideNav({ categories }: SideNavProps) {
               );
             }
             return (
-              <Link
-                key={svc.id}
-                href={href}
-                className={`sidenav__item ${active ? "sidenav__item--active" : ""}`}
-              >
-                <span className="sidenav__icon" aria-hidden="true">
-                  {svc.icon}
-                </span>
-                <span className="sidenav__label">{svc.name}</span>
-              </Link>
+              <div key={svc.id}>
+                <Link
+                  href={href}
+                  className={`sidenav__item ${active ? "sidenav__item--active" : ""}`}
+                >
+                  <span className="sidenav__icon" aria-hidden="true">
+                    <Icon name={svc.icon} />
+                  </span>
+                  <span className="sidenav__label">{svc.name}</span>
+                </Link>
+                {svc.subItems && svc.subItems.length > 0 && (
+                  <div className="sidenav__sub">
+                    {svc.subItems.map((sub) => {
+                      const subHref = `/${svc.id}/${sub.id}`;
+                      const subActive = pathname === subHref || pathname.startsWith(`${subHref}/`);
+                      return (
+                        <Link
+                          key={sub.id}
+                          href={subHref}
+                          className={`sidenav__item sidenav__item--sub ${
+                            subActive ? "sidenav__item--active" : ""
+                          }`}
+                        >
+                          <span className="sidenav__label">{sub.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

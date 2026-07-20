@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import Icon from "@/components/Icon";
 import { auth, signIn } from "@/auth";
 import { branding } from "@/lib/config";
 
@@ -21,7 +22,7 @@ export default async function LoginPage({
     <main className="login">
       <div className="login__card">
         <div className="login__logo" aria-hidden="true">
-          ☁️
+          <Icon name="cloud" size={44} />
         </div>
         <h1 className="login__title">{branding.productName}</h1>
         <p className="login__subtitle">{branding.organization} platform console</p>

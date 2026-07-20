@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import Icon from "@/components/Icon";
 import { auth } from "@/auth";
 import { getServices } from "@/lib/services";
 import { resolveActiveGroup } from "@/lib/session-group";
@@ -42,7 +43,7 @@ export default async function DashboardPage() {
             const card = (
               <>
                 <div className="card__icon" aria-hidden="true">
-                  {svc.icon}
+                  <Icon name={svc.icon} size={28} />
                 </div>
                 <div className="card__body">
                   <div className="card__title">
