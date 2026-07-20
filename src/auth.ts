@@ -19,6 +19,33 @@ import Keycloak from "next-auth/providers/keycloak";
 import { isAdmin, oidc } from "@/lib/config";
 import { normalizeGroups } from "@/lib/groups";
 
+/**
+ * Decode the claims (payload) of a JWT without verifying its signature. Used to
+ * read claims the SSO puts in the *access* token but not the ID token/userinfo.
+ * The token was just minted by our own OIDC exchange, so no verification is
+ * needed here - we only read it. Returns {} for anything unparseable.
+ */
+function decodeJwtClaims(jwt: string | undefined): Record<string, unknown> {
+  if (!jwt) return {};
+  const payload = jwt.split(".")[1];
+  if (!payload) return {};
+  try {
+    const json = Buffer.from(payload, "base64url").toString("utf8");
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Pull a groups claim from a claim set as a raw list (string or array). */
+function claimGroups(claims: Record<string, unknown>, claim: string): string[] {
+  const value = claims[claim];
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === "string" && value.length > 0) return [value];
+  return [];
+}
+
 /** Refresh the access token via the Keycloak token endpoint (rotation). */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
@@ -69,7 +96,15 @@ export const authConfig: NextAuthConfig = {
         token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at;
         const claims = (profile ?? {}) as Record<string, unknown>;
-        token.groups = normalizeGroups(claims[oidc.groupsClaim]);
+        // Keycloak (like the Serverless API) commonly carries `groups` in the
+        // access token rather than the ID token / userinfo. Read both and merge,
+        // so the portal sees the same membership the downstream API authorizes
+        // against instead of showing "no group membership".
+        const accessClaims = decodeJwtClaims(account.access_token);
+        token.groups = normalizeGroups([
+          ...claimGroups(claims, oidc.groupsClaim),
+          ...claimGroups(accessClaims, oidc.groupsClaim),
+        ]);
         token.username =
           (claims.preferred_username as string) ?? (claims.email as string) ?? token.sub ?? "";
         token.name = (claims.name as string) ?? token.name;

@@ -24,12 +24,19 @@ trusts - so one login works across every offering, and group names are
   `/profile` page shows the same detail.
 - **Service navigation, left rail.** The platform offerings grouped by category
   (GCP-style: _Serverless_, _Storage_, ...). Live services link to their page;
-  not-yet-available ones show as _Coming soon_.
-- **Serverless section with tabs.** GCP Compute–style sub-navigation: a
-  **Functions** tab and a **Containers** tab, each listing the active group's
-  workloads of that type from the Serverless API (sortable by name or creation
-  time). A shared header shows the platform capabilities from the public `/info`
-  endpoint. New workload types are added as more tabs.
+  not-yet-available ones show as _Coming soon_. A live service can declare
+  left-nav sub-sections (see `subItems` in `src/lib/services.ts`).
+- **Light / dark theme toggle, top-right.** The console follows the OS
+  preference by default; the toggle forces a light ("bright") or dark theme
+  per-device (persisted in `localStorage`, applied before first paint so there
+  is no flash). All glyphs are inline SVG icons (`src/components/Icon.tsx`) - no
+  emoji, no icon-font CDN - so they render identically in the airgap.
+- **Serverless section with sub-navigation.** GCP Compute–style: **Containers**
+  and **Functions** appear as nested items under _Serverless_ in the left rail,
+  each listing the active group's workloads of that type from the Serverless API
+  (sortable by name or creation time). A shared header shows the platform
+  capabilities from the public `/info`
+  endpoint. New workload types are added as more sub-sections.
 - **Workload detail view.** Each row opens a per-workload page with
   sub-tabs - **Status** (source + per-site deploy state and errors),
   **Variables** and **Secrets** (env, secrets redacted), **Files**,
@@ -84,16 +91,16 @@ src/
                       (keep-on-write env/files mapping)
   app/
     login/            SSO sign-in landing
-    (console)/        the shell: top bar (group switcher + profile) + side nav
+    (console)/        the shell: top bar (group switcher + theme + profile) + side nav
       dashboard/      service cards
-      serverless/     offering shell + Functions/Containers tabs
+      serverless/     offering shell (Containers/Functions live in the left nav)
         actions.ts    create/update/delete server actions (token forwarding)
         functions/    list, [name] detail, [name]/edit, new
         containers/   list, [name] detail, [name]/edit, new
       profile/        full account detail
     api/              Auth.js endpoints, active-group setter, health probe
-  components/         TopBar, GroupSwitcher, ProfileMenu, SideNav, ServerlessTabs,
-                      WorkloadTable, WorkloadDetail(+Tabs), WorkloadForm,
+  components/         TopBar, GroupSwitcher, ProfileMenu, ThemeToggle, Icon,
+                      SideNav, WorkloadTable, WorkloadDetail(+Tabs), WorkloadForm,
                       DeleteWorkloadButton, LogsToolbar, AutoRefresh, StatusPill
 charts/portal/        Helm chart (Deployment, Service, Route, ExternalSecret,
                       NetworkPolicy)
