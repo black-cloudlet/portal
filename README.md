@@ -73,12 +73,32 @@ Vault via the External Secrets Operator (see `charts/portal`). See
 | `PORTAL_OIDC_CLIENT_ID`      | Confidential OIDC client id.                         |
 | `PORTAL_OIDC_CLIENT_SECRET`  | OIDC client secret (from Vault via ESO).             |
 | `PORTAL_OIDC_GROUPS_CLAIM`   | Token claim carrying groups (default `groups`).      |
+| `PORTAL_OIDC_SCOPES`         | OIDC scopes at login (default `openid profile email`). |
+| `PORTAL_OIDC_DEBUG`          | Log which token claims carry groups (diagnostics).   |
 | `PORTAL_ADMIN_GROUPS`        | JSON list of admin groups (same rule as the API).    |
 | `PORTAL_SERVERLESS_API_URL`  | Address of the Serverless API.                       |
 | `PORTAL_SERVICES`            | Optional JSON to add/override the service catalog.    |
 
 Adding a new offering is env-only: point `PORTAL_SERVICES` (or a dedicated
 `PORTAL_<NAME>_API_URL`) at the new API - no UI changes. See `src/lib/services.ts`.
+
+### Troubleshooting: "You don't belong to any group"
+
+The portal reads the groups claim from the OIDC profile, the ID token, **and**
+the access token, and captures it **at sign-in**. If a user sees no groups:
+
+1. **Sign out and back in.** The group set is fixed when the session is created,
+   so an old session (from before a config/redeploy change) keeps its old,
+   possibly empty, membership until a fresh login.
+2. **Check the portal's Keycloak client emits the claim.** Group mappers are
+   per-client: the `cloud-console-portal` client needs its own **Group
+   Membership** mapper (or the `groups` client scope) with the token claim name
+   matching `PORTAL_OIDC_GROUPS_CLAIM` and "Add to ID/access token" enabled -
+   enabling it only on the Serverless API client is not enough.
+3. **Confirm with `PORTAL_OIDC_DEBUG=true`,** then read the pod logs on the next
+   sign-in: it prints the claim keys present in each token and where (if
+   anywhere) the groups claim was found. If your realm gates groups behind a
+   scope, add it to `PORTAL_OIDC_SCOPES` (e.g. `openid profile email groups`).
 
 ## Layout
 

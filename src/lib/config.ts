@@ -37,10 +37,22 @@ export interface OidcConfig {
   clientSecret: string;
   /** Token claim carrying the user's groups (default "groups"). */
   groupsClaim: string;
+  /**
+   * OIDC scopes requested at login. Some realms only emit the groups claim when
+   * a dedicated scope (e.g. "groups") is requested; add it here if so. Defaults
+   * to the standard `openid profile email`.
+   */
+  scopes: string;
   /** Normalized groups that grant the platform-admin role. */
   adminGroups: string[];
   /** Optional end-session cleanup on sign-out. */
   postLogoutRedirect: string;
+  /**
+   * When true, log (server-side, on sign-in) which claims the SSO tokens carry
+   * and where the groups claim was found. Use it to diagnose "no group
+   * membership" - it prints claim *keys* and the group names (not secrets).
+   */
+  debug: boolean;
 }
 
 export const oidc: OidcConfig = {
@@ -48,8 +60,10 @@ export const oidc: OidcConfig = {
   clientId: env("PORTAL_OIDC_CLIENT_ID", "cloud-console-portal"),
   clientSecret: env("PORTAL_OIDC_CLIENT_SECRET"),
   groupsClaim: env("PORTAL_OIDC_GROUPS_CLAIM", "groups"),
+  scopes: env("PORTAL_OIDC_SCOPES", "openid profile email"),
   adminGroups: envList("PORTAL_ADMIN_GROUPS"),
   postLogoutRedirect: env("PORTAL_POST_LOGOUT_REDIRECT"),
+  debug: env("PORTAL_OIDC_DEBUG").toLowerCase() === "true",
 };
 
 /** Branding shown in the top bar and browser tab. */
