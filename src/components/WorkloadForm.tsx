@@ -35,6 +35,14 @@ interface Props {
   info: PlatformInfo;
   group: string;
   initial?: WorkloadDetail;
+  /**
+   * "page" (default) renders the form as a standalone screen with its own back
+   * link and title. "modal" drops those chrome bits (the dialog supplies its own
+   * header) and turns Cancel into a close callback instead of a navigation.
+   */
+  variant?: "page" | "modal";
+  /** Called by Cancel in the modal variant. */
+  onClose?: () => void;
 }
 
 const FORM_TABS = [
@@ -55,7 +63,16 @@ type FormTab = (typeof FORM_TABS)[number]["id"];
  * function git token is stored server-side, so it is only sent to rotate it; the
  * container registry token is kept when the username is echoed without a token.
  */
-export default function WorkloadForm({ mode, type, info, group, initial }: Props) {
+export default function WorkloadForm({
+  mode,
+  type,
+  info,
+  group,
+  initial,
+  variant = "page",
+  onClose,
+}: Props) {
+  const isModal = variant === "modal";
   const isFn = type === "function";
   const seg = isFn ? "functions" : "containers";
   const isEdit = mode === "edit";
@@ -110,6 +127,25 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
+
+  /**
+   * Read a picked local file's text into a file row's content, defaulting the
+   * mount path to `/etc/<filename>` when the row doesn't have one yet.
+   */
+  function loadFileInto(index: number, file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      setFiles((p) =>
+        p.map((r, j) =>
+          j === index
+            ? { ...r, content: text, mountPath: r.mountPath.trim() || `/etc/${file.name}` }
+            : r,
+        ),
+      );
+    };
+    reader.readAsText(file);
+  }
 
   function buildScaling(): ScalingInput {
     return {
@@ -246,15 +282,19 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
 
   return (
     <form className="form stack" onSubmit={submit}>
-      <div className="detail__bar">
-        <Link className="backlink" href={cancelHref}>
-          ← Cancel
-        </Link>
-      </div>
+      {!isModal && (
+        <>
+          <div className="detail__bar">
+            <Link className="backlink" href={cancelHref}>
+              ← Cancel
+            </Link>
+          </div>
 
-      <h2 className="detail__title">
-        {mode === "create" ? `New ${type}` : `Edit ${initial!.name}`}
-      </h2>
+          <h2 className="detail__title">
+            {mode === "create" ? `New ${type}` : `Edit ${initial!.name}`}
+          </h2>
+        </>
+      )}
 
       {isEdit && (
         <div className="notice notice--warn">
@@ -548,6 +588,24 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
                 setFiles((p) => p.map((r, j) => (j === i ? { ...r, content: e.target.value } : r)))
               }
             />
+            <div className="file-editor__upload">
+              <label className="btn btn--sm">
+                Load from computer…
+                <input
+                  type="file"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    // Reset the input so picking the same file again still fires.
+                    e.target.value = "";
+                    if (file) loadFileInto(i, file);
+                  }}
+                />
+              </label>
+              <span className="field__hint">
+                Reads the file&rsquo;s contents into the box above.
+              </span>
+            </div>
           </div>
         ))}
         <div>
@@ -692,9 +750,15 @@ export default function WorkloadForm({ mode, type, info, group, initial }: Props
         <button type="submit" className="btn btn--primary" disabled={pending}>
           {pending ? "Saving…" : mode === "create" ? `Create ${type}` : "Save changes"}
         </button>
-        <Link className="btn" href={cancelHref}>
-          Cancel
-        </Link>
+        {isModal ? (
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+        ) : (
+          <Link className="btn" href={cancelHref}>
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

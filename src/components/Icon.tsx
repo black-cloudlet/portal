@@ -12,6 +12,13 @@ import type { ReactNode } from "react";
 const ICONS: Record<string, ReactNode> = {
   cloud: <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
+  // Close / dismiss.
+  x: (
+    <>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

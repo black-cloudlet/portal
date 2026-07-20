@@ -795,6 +795,13 @@ code {
 .table tbody tr:hover {
   background: var(--surface-2);
 }
+.table__row {
+  cursor: pointer;
+}
+.table__row:focus-visible {
+  outline: 2px solid var(--blue-600);
+  outline-offset: -2px;
+}
 .table__name {
   font-weight: 500;
 }
@@ -1138,6 +1145,76 @@ code {
 }
 .form-panel {
   animation: none;
+}
+
+/* Create dialog: the form floating over the list with a blurred backdrop. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.modal {
+  width: 100%;
+  max-width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.modal__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.modal__close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.modal__body {
+  padding: 20px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+/* Inside the dialog the form fills the panel (its own max-width is for pages). */
+.modal__body .form {
+  max-width: none;
+}
+
+/* Files tab: the "load from computer" control under a file's content box. */
+.file-editor__upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Logs tab controls */

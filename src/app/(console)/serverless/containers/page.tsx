@@ -1,8 +1,15 @@
 import Link from "next/link";
 
 import ApiErrorNotice from "@/components/ApiErrorNotice";
+import WorkloadCreateDialog from "@/components/WorkloadCreateDialog";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listContainers, type WorkloadSort, type WorkloadSummary } from "@/lib/serverless";
+import {
+  getPlatformInfo,
+  listContainers,
+  type PlatformInfo,
+  type WorkloadSort,
+  type WorkloadSummary,
+} from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Containers" };
@@ -33,6 +40,10 @@ export default async function ContainersPage({
     fetchError = err;
   }
 
+  // The create dialog needs the platform capabilities up front; if that lookup
+  // fails, fall back to the standalone /new screen (which surfaces the error).
+  const info: PlatformInfo | null = await getPlatformInfo().catch(() => null);
+
   return (
     <div className="stack">
       <div className="toolbar">
@@ -51,9 +62,13 @@ export default async function ContainersPage({
             Created
           </Link>
         </div>
-        <Link className="btn btn--primary" href="/serverless/containers/new">
-          + Create container
-        </Link>
+        {info ? (
+          <WorkloadCreateDialog type="container" info={info} group={activeGroup} />
+        ) : (
+          <Link className="btn btn--primary" href="/serverless/containers/new">
+            + Create container
+          </Link>
+        )}
       </div>
       {fetchError ? (
         <ApiErrorNotice error={fetchError} />
