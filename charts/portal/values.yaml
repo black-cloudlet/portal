@@ -40,6 +40,12 @@ sso:
   issuer: https://sso.internal/realms/serverless
   clientId: cloud-console-portal
   groupsClaim: groups
+  # OIDC scopes requested at login. Some realms only emit the groups claim when
+  # a dedicated scope is asked for; set e.g. "openid profile email groups" then.
+  scopes: openid profile email
+  # Log (server-side, on sign-in) which token claims carry groups. Turn on to
+  # diagnose "no group membership", then turn back off. Keys + group names only.
+  debug: false
   adminGroups:
     - platform-admins
 

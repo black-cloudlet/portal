@@ -39,6 +39,12 @@ spec:
               value: {{ .Values.sso.clientId | quote }}
             - name: PORTAL_OIDC_GROUPS_CLAIM
               value: {{ .Values.sso.groupsClaim | quote }}
+            - name: PORTAL_OIDC_SCOPES
+              value: {{ .Values.sso.scopes | quote }}
+            {{- if .Values.sso.debug }}
+            - name: PORTAL_OIDC_DEBUG
+              value: "true"
+            {{- end }}
             - name: PORTAL_ADMIN_GROUPS
               value: {{ toJson .Values.sso.adminGroups | quote }}
             - name: PORTAL_PRODUCT_NAME
