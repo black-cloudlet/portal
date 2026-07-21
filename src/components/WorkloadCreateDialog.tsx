@@ -54,11 +54,11 @@ export default function WorkloadCreateDialog({
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label={`New ${type}`}
+            aria-label={`Create ${type}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal__head">
-              <h2 className="modal__title">New {type}</h2>
+              <h2 className="modal__title">Create {type}</h2>
               <button
                 type="button"
                 className="modal__close"

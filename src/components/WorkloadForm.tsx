@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import {
   createWorkloadAction,
   updateWorkloadAction,
   type ActionError,
 } from "@/app/(console)/serverless/actions";
+import Icon from "@/components/Icon";
 import type {
   ContainerCreateInput,
   ContainerUpdateInput,
@@ -47,16 +48,32 @@ interface Props {
 
 const FORM_TABS = [
   { id: "general", label: "General" },
-  { id: "variables", label: "Variables" },
-  { id: "secrets", label: "Secrets" },
-  { id: "files", label: "Files" },
-  { id: "advanced", label: "Advanced" },
+  { id: "env", label: "Variables & Secrets" },
+  { id: "scaling", label: "Scaling Configuration" },
 ] as const;
 type FormTab = (typeof FORM_TABS)[number]["id"];
 
+/** Time-unit choices for the scale-down delay (value + Go-duration suffix). */
+const TIME_UNITS = [
+  { id: "s", label: "seconds" },
+  { id: "m", label: "minutes" },
+  { id: "h", label: "hours" },
+] as const;
+
+/** Split a stored Go duration like "30s" into a number + unit for the two inputs. */
+function parseDelay(v: string | null | undefined): { value: string; unit: string } {
+  if (!v) return { value: "", unit: "s" };
+  const m = /^(\d+)\s*(s|m|h)?$/.exec(v.trim());
+  if (m) return { value: m[1], unit: m[2] ?? "s" };
+  return { value: v.trim(), unit: "s" };
+}
+
 /**
- * Create or edit a function/container, organized into tabs (General, Variables,
- * Secrets, Files, Advanced) driven by the platform capabilities from /info.
+ * Create or edit a function/container. The form mirrors the platform's create
+ * flow: a "before you begin" banner, then three tabs — General (identity +
+ * source + placement), Variables & Secrets (env vars, secret env vars, and
+ * mounted files with drag-and-drop upload), and Scaling Configuration (the
+ * autoscaler settings from /info).
  *
  * Edit follows the API's keep-on-write contract: a secret left blank keeps its
  * stored value, a value entered changes it, and dropping a row removes it. The
@@ -74,6 +91,7 @@ export default function WorkloadForm({
 }: Props) {
   const isModal = variant === "modal";
   const isFn = type === "function";
+  const typeLabel = isFn ? "Function" : "Container";
   const seg = isFn ? "functions" : "containers";
   const isEdit = mode === "edit";
   const sizes = info.sizes.length ? info.sizes : ["small"];
@@ -111,6 +129,8 @@ export default function WorkloadForm({
       existing: true,
     })) ?? [],
   );
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Advanced: placement + scaling
   const [size, setSize] = useState(initial?.size ?? sizes[0]);
@@ -119,41 +139,50 @@ export default function WorkloadForm({
   const [hostname, setHostname] = useState(initial?.hostname ?? "");
   const [sites, setSites] = useState<string[]>([]);
   const initScale = initial?.scaling;
+  const initDelay = parseDelay(initScale?.scaleDownDelay);
   const [metric, setMetric] = useState(initScale?.metric ?? defaultMetric);
   const [minScale, setMinScale] = useState(String(initScale?.minScale ?? 0));
-  const [maxScale, setMaxScale] = useState(String(initScale?.maxScale ?? 3));
+  const [maxScale, setMaxScale] = useState(String(initScale?.maxScale ?? 5));
   const [target, setTarget] = useState(initScale?.target != null ? String(initScale.target) : "");
-  const [scaleDownDelay, setScaleDownDelay] = useState(initScale?.scaleDownDelay ?? "");
+  const [delayValue, setDelayValue] = useState(initDelay.value);
+  const [delayUnit, setDelayUnit] = useState(initDelay.unit);
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
 
-  /**
-   * Read a picked local file's text into a file row's content, defaulting the
-   * mount path to `/etc/<filename>` when the row doesn't have one yet.
-   */
-  function loadFileInto(index: number, file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = typeof reader.result === "string" ? reader.result : "";
-      setFiles((p) =>
-        p.map((r, j) =>
-          j === index
-            ? { ...r, content: text, mountPath: r.mountPath.trim() || `/etc/${file.name}` }
-            : r,
-        ),
-      );
-    };
-    reader.readAsText(file);
+  /** Read picked/dropped local files into new file rows (mount path = /etc/<name>). */
+  async function addFiles(list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const rows = await Promise.all(
+      Array.from(list).map(
+        (file) =>
+          new Promise<FileRow>((resolve) => {
+            const reader = new FileReader();
+            const done = (content: string) =>
+              resolve({
+                mountPath: `/etc/${file.name}`,
+                content,
+                secret: false,
+                readOnly: true,
+                existing: false,
+              });
+            reader.onload = () => done(typeof reader.result === "string" ? reader.result : "");
+            reader.onerror = () => done("");
+            reader.readAsText(file);
+          }),
+      ),
+    );
+    setFiles((p) => [...p, ...rows]);
   }
 
   function buildScaling(): ScalingInput {
+    const delay = delayValue.trim() === "" ? null : `${delayValue.trim()}${delayUnit}`;
     return {
       minScale: Number(minScale),
       maxScale: Number(maxScale),
       metric,
       target: target.trim() === "" ? null : Number(target),
-      scaleDownDelay: scaleDownDelay.trim() === "" ? null : scaleDownDelay.trim(),
+      scaleDownDelay: delay,
     };
   }
 
@@ -186,7 +215,7 @@ export default function WorkloadForm({
     }
     for (const s of secrets) {
       if (s.name.trim() !== "" && s.value.trim() === "" && !(isEdit && s.existing))
-        return { tab: "secrets", message: `Secret "${s.name}" needs a value.` };
+        return { tab: "env", message: `Secret "${s.name}" needs a value.` };
     }
     for (const f of files) {
       if (
@@ -195,7 +224,7 @@ export default function WorkloadForm({
         f.content.trim() === "" &&
         !(isEdit && f.existing)
       )
-        return { tab: "files", message: `Secret file "${f.mountPath}" needs content.` };
+        return { tab: "env", message: `Secret file "${f.mountPath}" needs content.` };
     }
     return null;
   }
@@ -291,9 +320,27 @@ export default function WorkloadForm({
           </div>
 
           <h2 className="detail__title">
-            {mode === "create" ? `New ${type}` : `Edit ${initial!.name}`}
+            {mode === "create" ? `Create ${typeLabel}` : `Edit ${initial!.name}`}
           </h2>
         </>
+      )}
+
+      {mode === "create" && (
+        <div className="form-banner">
+          <span className="form-banner__icon" aria-hidden="true">
+            <Icon name="info" size={18} />
+          </span>
+          <div>
+            <strong>Before you begin: Essential {typeLabel} Docs</strong>
+            <p className="form-banner__text">
+              Learn more about how to create a {typeLabel} in our{" "}
+              <a href="/docs" target="_blank" rel="noreferrer">
+                Documentation Center
+              </a>
+              .
+            </p>
+          </div>
+        </div>
       )}
 
       {isEdit && (
@@ -321,39 +368,39 @@ export default function WorkloadForm({
       </nav>
 
       {/* ---- General ---- */}
-      <div className="form-panel stack" hidden={tab !== "general"}>
-        {mode === "create" && (
-          <label className="field">
-            <span className="field__label">Name</span>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="my-workload"
-            />
-            <span className="field__hint">
-              Lowercase DNS-1123 label.{" "}
-              {hostPreview && (
-                <>
-                  Host: <code>{hostPreview}</code>
-                </>
-              )}
-            </span>
-          </label>
-        )}
-
-        {isFn ? (
-          <>
+      <div className="form-panel" hidden={tab !== "general"}>
+        <div className="form-grid">
+          {mode === "create" && (
             <label className="field">
-              <span className="field__label">Git repository</span>
+              <span className="field__label">Name*</span>
               <input
                 className="input"
-                value={gitRepo}
-                onChange={(e) => setGitRepo(e.target.value)}
-                placeholder="https://git.internal/team/app.git"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={`${typeLabel.toLowerCase()} name`}
               />
+              <span className="field__hint">
+                Lowercase DNS-1123 label.{" "}
+                {hostPreview && (
+                  <>
+                    Host: <code>{hostPreview}</code>
+                  </>
+                )}
+              </span>
             </label>
-            <div className="field-row">
+          )}
+
+          {isFn ? (
+            <>
+              <label className="field field--full">
+                <span className="field__label">Git repository*</span>
+                <input
+                  className="input"
+                  value={gitRepo}
+                  onChange={(e) => setGitRepo(e.target.value)}
+                  placeholder="https://git.internal/team/app.git"
+                />
+              </label>
               <label className="field">
                 <span className="field__label">Branch</span>
                 <input
@@ -376,37 +423,36 @@ export default function WorkloadForm({
                   ))}
                 </select>
               </label>
-            </div>
-            <label className="field">
-              <span className="field__label">Git token{isEdit ? " (only to rotate)" : ""}</span>
-              <input
-                className="input"
-                type="password"
-                value={gitToken}
-                onChange={(e) => setGitToken(e.target.value)}
-                placeholder={isEdit ? "leave blank to keep the stored token" : ""}
-                autoComplete="off"
-              />
-            </label>
-          </>
-        ) : (
-          <>
-            <label className="field">
-              <span className="field__label">Image</span>
-              <input
-                className="input"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                placeholder="registry.internal/team/app:latest"
-              />
-            </label>
-            <div className="field-row">
+              <label className="field field--full">
+                <span className="field__label">Git token{isEdit ? " (only to rotate)" : ""}</span>
+                <input
+                  className="input"
+                  type="password"
+                  value={gitToken}
+                  onChange={(e) => setGitToken(e.target.value)}
+                  placeholder={isEdit ? "leave blank to keep the stored token" : "Token"}
+                  autoComplete="off"
+                />
+              </label>
+            </>
+          ) : (
+            <>
               <label className="field">
-                <span className="field__label">Registry username (optional)</span>
+                <span className="field__label">Registry path*</span>
+                <input
+                  className="input"
+                  value={image}
+                  onChange={(e) => setImage(e.target.value)}
+                  placeholder="registry.internal/team/app:latest"
+                />
+              </label>
+              <label className="field">
+                <span className="field__label">Registry username</span>
                 <input
                   className="input"
                   value={registryUsername}
                   onChange={(e) => setRegistryUsername(e.target.value)}
+                  placeholder="Username"
                   autoComplete="off"
                 />
               </label>
@@ -419,215 +465,20 @@ export default function WorkloadForm({
                   type="password"
                   value={registryToken}
                   onChange={(e) => setRegistryToken(e.target.value)}
-                  placeholder={isEdit ? "leave blank to keep" : ""}
+                  placeholder={isEdit ? "leave blank to keep" : "Token"}
                   autoComplete="off"
                 />
               </label>
-            </div>
-            <span className="field__hint">
-              {isEdit
-                ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
-                : "Provide username and token together for a private image, or leave both blank for a public one."}
-            </span>
-          </>
-        )}
-      </div>
+              <div className="field field--full field--hint-only">
+                <span className="field__hint">
+                  {isEdit
+                    ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
+                    : "Provide username and token together for a private image, or leave both blank for a public one."}
+                </span>
+              </div>
+            </>
+          )}
 
-      {/* ---- Variables (non-secret env) ---- */}
-      <div className="form-panel stack" hidden={tab !== "variables"}>
-        <p className="field__hint">Plain environment variables, stored inline on the workload.</p>
-        {variables.map((row, i) => (
-          <div key={i} className="kv-row">
-            <input
-              className="input"
-              placeholder="NAME"
-              value={row.name}
-              onChange={(e) =>
-                setVariables((p) => p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
-              }
-            />
-            <input
-              className="input"
-              placeholder="value"
-              value={row.value}
-              onChange={(e) =>
-                setVariables((p) =>
-                  p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
-                )
-              }
-            />
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => setVariables((p) => p.filter((_, j) => j !== i))}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <div>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() => setVariables((p) => [...p, { name: "", value: "" }])}
-          >
-            + Add variable
-          </button>
-        </div>
-      </div>
-
-      {/* ---- Secrets (secret env) ---- */}
-      <div className="form-panel stack" hidden={tab !== "secrets"}>
-        <p className="field__hint">
-          Secret environment variables, stored in a Kubernetes Secret and never shown after saving.
-          {isEdit && " Leave a value blank to keep the stored secret."}
-        </p>
-        {secrets.map((row, i) => (
-          <div key={i} className="kv-row">
-            <input
-              className="input"
-              placeholder="NAME"
-              value={row.name}
-              onChange={(e) =>
-                setSecrets((p) => p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)))
-              }
-            />
-            <input
-              className="input"
-              type="password"
-              placeholder={row.existing ? "•••• stored — blank keeps it" : "secret value"}
-              value={row.value}
-              autoComplete="off"
-              onChange={(e) =>
-                setSecrets((p) => p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))
-              }
-            />
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => setSecrets((p) => p.filter((_, j) => j !== i))}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-        <div>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() => setSecrets((p) => [...p, { name: "", value: "", existing: false }])}
-          >
-            + Add secret
-          </button>
-        </div>
-      </div>
-
-      {/* ---- Files ---- */}
-      <div className="form-panel stack" hidden={tab !== "files"}>
-        <p className="field__hint">
-          Files mounted into the workload. Mark a file secret to store it in a Secret.
-          {isEdit && " Leave a secret file's content blank to keep the stored content."}
-        </p>
-        {files.map((row, i) => (
-          <div key={i} className="file-editor">
-            <div className="kv-row">
-              <input
-                className="input"
-                placeholder="/etc/app/config.yaml"
-                value={row.mountPath}
-                onChange={(e) =>
-                  setFiles((p) =>
-                    p.map((r, j) => (j === i ? { ...r, mountPath: e.target.value } : r)),
-                  )
-                }
-              />
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={row.secret}
-                  onChange={(e) =>
-                    setFiles((p) =>
-                      p.map((r, j) => (j === i ? { ...r, secret: e.target.checked } : r)),
-                    )
-                  }
-                />
-                secret
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={row.readOnly}
-                  onChange={(e) =>
-                    setFiles((p) =>
-                      p.map((r, j) => (j === i ? { ...r, readOnly: e.target.checked } : r)),
-                    )
-                  }
-                />
-                read-only
-              </label>
-              <button
-                type="button"
-                className="btn btn--sm"
-                onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}
-              >
-                Remove
-              </button>
-            </div>
-            <textarea
-              className="input textarea"
-              placeholder={
-                row.secret && row.existing
-                  ? "blank keeps the stored content"
-                  : row.secret
-                    ? "secret file content"
-                    : "file content"
-              }
-              rows={3}
-              value={row.content}
-              onChange={(e) =>
-                setFiles((p) => p.map((r, j) => (j === i ? { ...r, content: e.target.value } : r)))
-              }
-            />
-            <div className="file-editor__upload">
-              <label className="btn btn--sm">
-                Load from computer…
-                <input
-                  type="file"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    // Reset the input so picking the same file again still fires.
-                    e.target.value = "";
-                    if (file) loadFileInto(i, file);
-                  }}
-                />
-              </label>
-              <span className="field__hint">
-                Reads the file&rsquo;s contents into the box above.
-              </span>
-            </div>
-          </div>
-        ))}
-        <div>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() =>
-              setFiles((p) => [
-                ...p,
-                { mountPath: "", content: "", secret: false, readOnly: true, existing: false },
-              ])
-            }
-          >
-            + Add file
-          </button>
-        </div>
-      </div>
-
-      {/* ---- Advanced (placement + scaling) ---- */}
-      <div className="form-panel stack" hidden={tab !== "advanced"}>
-        <h3 className="section-title">Placement</h3>
-        <div className="field-row">
           <label className="field">
             <span className="field__label">Size</span>
             <select className="input" value={size} onChange={(e) => setSize(e.target.value)}>
@@ -647,55 +498,308 @@ export default function WorkloadForm({
               placeholder="defaults to the generated host"
             />
           </label>
+
+          {mode === "create" && info.sites.length > 0 && (
+            <div className="field field--full">
+              <span className="field__label">Sites (none selected = all)</span>
+              <div className="checks">
+                {info.sites.map((s) => (
+                  <label key={s} className="check">
+                    <input
+                      type="checkbox"
+                      checked={sites.includes(s)}
+                      onChange={(e) =>
+                        setSites((prev) =>
+                          e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
+                        )
+                      }
+                    />
+                    {s}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-        {mode === "create" && info.sites.length > 0 && (
-          <div className="field">
-            <span className="field__label">Sites (none selected = all)</span>
-            <div className="checks">
-              {info.sites.map((s) => (
-                <label key={s} className="check">
+      </div>
+
+      {/* ---- Variables & Secrets (env + files) ---- */}
+      <div className="form-panel stack" hidden={tab !== "env"}>
+        {/* Variables (non-secret env) */}
+        <section className="form-section">
+          <div className="form-section__head">
+            <h3 className="section-title">Variables</h3>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() => setVariables((p) => [...p, { name: "", value: "" }])}
+            >
+              Add Variable
+            </button>
+          </div>
+          {variables.length === 0 ? (
+            <div className="empty-state">
+              <Icon name="code" size={28} />
+              <p>There are no variables yet</p>
+            </div>
+          ) : (
+            <div className="stack">
+              {variables.map((row, i) => (
+                <div key={i} className="kv-row">
                   <input
-                    type="checkbox"
-                    checked={sites.includes(s)}
+                    className="input"
+                    placeholder="NAME"
+                    value={row.name}
                     onChange={(e) =>
-                      setSites((prev) =>
-                        e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
+                      setVariables((p) =>
+                        p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
                       )
                     }
                   />
-                  {s}
-                </label>
+                  <input
+                    className="input"
+                    placeholder="value"
+                    value={row.value}
+                    onChange={(e) =>
+                      setVariables((p) =>
+                        p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => setVariables((p) => p.filter((_, j) => j !== i))}
+                  >
+                    Remove
+                  </button>
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </section>
 
-        <h3 className="section-title">Autoscaling</h3>
-        <div className="field-row">
+        {/* Secrets (secret env) */}
+        <section className="form-section">
+          <div className="form-section__head">
+            <h3 className="section-title">Secrets</h3>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() => setSecrets((p) => [...p, { name: "", value: "", existing: false }])}
+            >
+              Add Secret
+            </button>
+          </div>
+          <p className="field__hint">
+            Stored in a Kubernetes Secret and never shown after saving.
+            {isEdit && " Leave a value blank to keep the stored secret."}
+          </p>
+          {secrets.length === 0 ? (
+            <div className="empty-state">
+              <Icon name="code" size={28} />
+              <p>There are no secrets yet</p>
+            </div>
+          ) : (
+            <div className="stack">
+              {secrets.map((row, i) => (
+                <div key={i} className="kv-row">
+                  <input
+                    className="input"
+                    placeholder="NAME"
+                    value={row.name}
+                    onChange={(e) =>
+                      setSecrets((p) =>
+                        p.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
+                      )
+                    }
+                  />
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder={row.existing ? "•••• stored — blank keeps it" : "secret value"}
+                    value={row.value}
+                    autoComplete="off"
+                    onChange={(e) =>
+                      setSecrets((p) =>
+                        p.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => setSecrets((p) => p.filter((_, j) => j !== i))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Files */}
+        <section className="form-section">
+          <div className="form-section__head">
+            <h3 className="section-title">
+              Files{" "}
+              <span className="section-title__info" title="Mounted into the workload filesystem.">
+                <Icon name="info" size={14} />
+              </span>
+            </h3>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() =>
+                setFiles((p) => [
+                  ...p,
+                  { mountPath: "", content: "", secret: false, readOnly: true, existing: false },
+                ])
+              }
+            >
+              Add File
+            </button>
+          </div>
+
+          <div
+            className={`dropzone${dragging ? " dropzone--active" : ""}`}
+            role="button"
+            tabIndex={0}
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void addFiles(e.dataTransfer.files);
+            }}
+          >
+            <Icon name="upload" size={26} />
+            <span>Drag and drop here or click to upload</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                void addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          {files.length > 0 && (
+            <div className="stack">
+              {files.map((row, i) => (
+                <div key={i} className="file-editor">
+                  <div className="kv-row">
+                    <input
+                      className="input"
+                      placeholder="/etc/app/config.yaml"
+                      value={row.mountPath}
+                      onChange={(e) =>
+                        setFiles((p) =>
+                          p.map((r, j) => (j === i ? { ...r, mountPath: e.target.value } : r)),
+                        )
+                      }
+                    />
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={row.secret}
+                        onChange={(e) =>
+                          setFiles((p) =>
+                            p.map((r, j) => (j === i ? { ...r, secret: e.target.checked } : r)),
+                          )
+                        }
+                      />
+                      secret
+                    </label>
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={row.readOnly}
+                        onChange={(e) =>
+                          setFiles((p) =>
+                            p.map((r, j) => (j === i ? { ...r, readOnly: e.target.checked } : r)),
+                          )
+                        }
+                      />
+                      read-only
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <textarea
+                    className="input textarea"
+                    placeholder={
+                      row.secret && row.existing
+                        ? "blank keeps the stored content"
+                        : row.secret
+                          ? "secret file content"
+                          : "file content"
+                    }
+                    rows={3}
+                    value={row.content}
+                    onChange={(e) =>
+                      setFiles((p) =>
+                        p.map((r, j) => (j === i ? { ...r, content: e.target.value } : r)),
+                      )
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ---- Scaling Configuration ---- */}
+      <div className="form-panel" hidden={tab !== "scaling"}>
+        <div className="form-grid">
           <label className="field">
-            <span className="field__label">Metric</span>
-            <select className="input" value={metric} onChange={(e) => setMetric(e.target.value)}>
-              {metrics.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+            <span className="field__label">Scale Down Delay*</span>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              value={delayValue}
+              onChange={(e) => setDelayValue(e.target.value)}
+              placeholder="10"
+            />
+          </label>
+          <label className="field">
+            <span className="field__label">Time Unit</span>
+            <select
+              className="input"
+              value={delayUnit}
+              onChange={(e) => setDelayUnit(e.target.value)}
+            >
+              {TIME_UNITS.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.label}
                 </option>
               ))}
             </select>
           </label>
+
           <label className="field">
-            <span className="field__label">Target (blank = default)</span>
-            <input
-              className="input"
-              type="number"
-              min={1}
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
-          </label>
-        </div>
-        <div className="field-row">
-          <label className="field">
-            <span className="field__label">Min replicas</span>
+            <span className="field__label">Min Replicas*</span>
             <input
               className="input"
               type="number"
@@ -705,7 +809,7 @@ export default function WorkloadForm({
             />
           </label>
           <label className="field">
-            <span className="field__label">Max replicas</span>
+            <span className="field__label">Max Replicas*</span>
             <input
               className="input"
               type="number"
@@ -714,19 +818,38 @@ export default function WorkloadForm({
               onChange={(e) => setMaxScale(e.target.value)}
             />
           </label>
+
           <label className="field">
-            <span className="field__label">Scale-down delay</span>
+            <span className="field__label">Scaling Metric*</span>
+            <select className="input" value={metric} onChange={(e) => setMetric(e.target.value)}>
+              {metrics.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field__label">Scale Target* (blank = default)</span>
             <input
               className="input"
-              value={scaleDownDelay}
-              onChange={(e) => setScaleDownDelay(e.target.value)}
-              placeholder="e.g. 30s, 5m"
+              type="number"
+              min={1}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="100"
             />
           </label>
         </div>
-        <span className="field__hint">
+        <p className="field__hint">
           cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1).
-        </span>
+        </p>
+        <p className="field__hint">
+          Want to know more about Scaling your {typeLabel.toLowerCase()}?{" "}
+          <a href="/docs" target="_blank" rel="noreferrer">
+            Read more
+          </a>
+        </p>
       </div>
 
       {error && (
@@ -746,10 +869,7 @@ export default function WorkloadForm({
         </div>
       )}
 
-      <div className="form__actions">
-        <button type="submit" className="btn btn--primary" disabled={pending}>
-          {pending ? "Saving…" : mode === "create" ? `Create ${type}` : "Save changes"}
-        </button>
+      <div className={`form__actions${isModal ? " form__actions--modal" : ""}`}>
         {isModal ? (
           <button type="button" className="btn" onClick={onClose}>
             Cancel
@@ -759,6 +879,9 @@ export default function WorkloadForm({
             Cancel
           </Link>
         )}
+        <button type="submit" className="btn btn--primary" disabled={pending}>
+          {pending ? "Saving…" : mode === "create" ? `Create ${typeLabel}` : "Save changes"}
+        </button>
       </div>
     </form>
   );

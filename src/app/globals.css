@@ -1144,7 +1144,13 @@ code {
   border-bottom-color: var(--blue-600);
 }
 .form-panel {
-  animation: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* The HTML `hidden` attribute must win over the flex display above. */
+.form-panel[hidden] {
+  display: none;
 }
 
 /* Create dialog: the form floating over the list with a blurred backdrop. */
@@ -1209,12 +1215,127 @@ code {
   max-width: none;
 }
 
-/* Files tab: the "load from computer" control under a file's content box. */
-.file-editor__upload {
+/* "Before you begin" callout at the top of the create form. */
+.form-banner {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--blue-600);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--blue-50);
+}
+.form-banner__icon {
+  flex-shrink: 0;
+  color: var(--blue-600);
+  margin-top: 1px;
+}
+.form-banner strong {
+  font-size: 14px;
+}
+.form-banner__text {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Two-column field grid used by the General and Scaling tabs. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+.field--full {
+  grid-column: 1 / -1;
+}
+.field--hint-only {
+  gap: 0;
+}
+@media (max-width: 560px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A titled block on the Variables & Secrets tab, with an action on the right. */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-section__head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-title__info {
+  display: inline-flex;
+  vertical-align: middle;
+  color: var(--text-muted);
+}
+
+/* Empty-list placeholder (no variables / no secrets yet). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Drag-and-drop / click-to-upload target on the Files section. */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--blue-600);
+  outline: none;
+}
+.dropzone--active {
+  border-color: var(--blue-600);
+  background: var(--blue-50);
+  color: var(--blue-600);
+}
+.dropzone span {
+  font-size: 13px;
+}
+
+/* Outlined button (Add Variable / Add Secret / Add File). */
+.btn--outline {
+  border-color: var(--blue-600);
+  color: var(--blue-600);
+}
+.btn--outline:hover {
+  background: var(--blue-50);
+}
+
+/* In the modal, the footer actions sit right-aligned with Create last. */
+.form__actions--modal {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
 }
 
 /* Logs tab controls */
