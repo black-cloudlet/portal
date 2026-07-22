@@ -4,7 +4,7 @@ import TopBar from "@/components/TopBar";
 import SideNav from "@/components/SideNav";
 import { auth } from "@/auth";
 import { branding } from "@/lib/config";
-import { getServicesByCategory } from "@/lib/services";
+import { getServices } from "@/lib/services";
 import { resolveActiveGroup } from "@/lib/session-group";
 
 /**
@@ -19,7 +19,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
 
   const groups = session.user.groups;
   const activeGroup = await resolveActiveGroup(groups);
-  const categories = getServicesByCategory();
+  const services = getServices();
 
   return (
     <div className="shell">
@@ -36,7 +36,7 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
         activeGroup={activeGroup}
       />
       <div className="shell__body">
-        <SideNav categories={categories} />
+        <SideNav services={services} />
         <main className="shell__main">{children}</main>
       </div>
     </div>

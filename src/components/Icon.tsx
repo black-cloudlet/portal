@@ -97,6 +97,118 @@ const ICONS: Record<string, ReactNode> = {
       <line x1="12" x2="12" y1="17" y2="21" />
     </>
   ),
+  // Catalog / grid view: four squares.
+  grid: (
+    <>
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
+    </>
+  ),
+  // List view: rows.
+  list: (
+    <>
+      <line x1="8" x2="21" y1="6" y2="6" />
+      <line x1="8" x2="21" y1="12" y2="12" />
+      <line x1="8" x2="21" y1="18" y2="18" />
+      <line x1="3" x2="3.01" y1="6" y2="6" />
+      <line x1="3" x2="3.01" y1="12" y2="12" />
+      <line x1="3" x2="3.01" y1="18" y2="18" />
+    </>
+  ),
+  // Search.
+  search: (
+    <>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  ),
+  // Add / create.
+  plus: (
+    <>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </>
+  ),
+  // Compute: stacked servers.
+  server: (
+    <>
+      <rect width="20" height="8" x="2" y="2" rx="2" />
+      <rect width="20" height="8" x="2" y="14" rx="2" />
+      <line x1="6" x2="6.01" y1="6" y2="6" />
+      <line x1="6" x2="6.01" y1="18" y2="18" />
+    </>
+  ),
+  // Budget: a wallet.
+  wallet: (
+    <>
+      <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2" />
+      <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+    </>
+  ),
+  // Networking: connected nodes.
+  network: (
+    <>
+      <rect x="9" y="2" width="6" height="6" rx="1" />
+      <rect x="2" y="16" width="6" height="6" rx="1" />
+      <rect x="16" y="16" width="6" height="6" rx="1" />
+      <path d="M12 8v4" />
+      <path d="M5 16v-2h14v2" />
+    </>
+  ),
+  // Observability: an activity pulse.
+  activity: <path d="M22 12h-4l-3 9L9 3l-3 9H2" />,
+  // Data integration: shuffle arrows.
+  shuffle: (
+    <>
+      <path d="M16 3h5v5" />
+      <path d="M4 20 21 3" />
+      <path d="M21 16v5h-5" />
+      <path d="m15 15 6 6" />
+      <path d="M4 4l5 5" />
+    </>
+  ),
+  // Data analytics: a bar chart.
+  "bar-chart": (
+    <>
+      <line x1="12" x2="12" y1="20" y2="10" />
+      <line x1="18" x2="18" y1="20" y2="4" />
+      <line x1="6" x2="6" y1="20" y2="16" />
+    </>
+  ),
+  // Dev tools: a wrench.
+  wrench: (
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+  ),
+  // Machine learning: a CPU.
+  cpu: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <path d="M9 2v2" />
+      <path d="M15 2v2" />
+      <path d="M9 20v2" />
+      <path d="M15 20v2" />
+      <path d="M2 9h2" />
+      <path d="M2 15h2" />
+      <path d="M20 9h2" />
+      <path d="M20 15h2" />
+    </>
+  ),
+  // Security: a shield.
+  shield: (
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+  ),
+  // Groups: people.
+  users: (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
 };
 
 interface IconProps {

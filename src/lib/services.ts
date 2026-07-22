@@ -35,7 +35,27 @@ export interface ServiceDef {
 
 /** Built-in catalog. Addresses come from env; unset -> disabled ("Coming soon"). */
 function defaultCatalog(): ServiceDef[] {
+  // A future offering with no address yet renders as a disabled "Coming soon"
+  // nav entry - the catalog is intentionally broad (GCP-style) so the shell
+  // reads as a full platform console; each lights up once its API lands.
+  const soon = (
+    id: string,
+    name: string,
+    icon: string,
+    category: string,
+    description: string,
+  ): ServiceDef => ({
+    id,
+    name,
+    icon,
+    category,
+    description,
+    apiBaseUrl: "",
+    enabled: false,
+  });
+
   return [
+    soon("compute", "Compute", "server", "Compute", "Virtual machines and instance groups."),
     {
       id: "serverless",
       name: "Serverless",
@@ -45,11 +65,25 @@ function defaultCatalog(): ServiceDef[] {
       apiBaseUrl: stripSlash(process.env.PORTAL_SERVERLESS_API_URL ?? ""),
       enabled: Boolean(process.env.PORTAL_SERVERLESS_API_URL),
       subItems: [
-        { id: "containers", name: "Containers" },
         { id: "functions", name: "Functions" },
+        { id: "containers", name: "Containers" },
+        { id: "groups", name: "Groups" },
       ],
     },
-    // Future offerings register here (or via PORTAL_SERVICES) as their APIs land.
+    soon(
+      "databases",
+      "Databases",
+      "database",
+      "Databases",
+      "Managed relational and key-value stores.",
+    ),
+    soon(
+      "networking",
+      "Networking",
+      "network",
+      "Networking",
+      "Load balancers, DNS, and private links.",
+    ),
     {
       id: "storage",
       name: "Object Storage",
@@ -59,6 +93,12 @@ function defaultCatalog(): ServiceDef[] {
       apiBaseUrl: stripSlash(process.env.PORTAL_STORAGE_API_URL ?? ""),
       enabled: Boolean(process.env.PORTAL_STORAGE_API_URL),
     },
+    soon("observability", "Observability", "activity", "Operations", "Metrics, logs, and traces."),
+    soon("data-integration", "Data Integration", "shuffle", "Data", "Pipelines and event streams."),
+    soon("data-analytics", "Data Analytics", "bar-chart", "Data", "Warehouses and query engines."),
+    soon("dev-tools", "Dev Tools", "wrench", "Tools", "Build, registry, and CI/CD."),
+    soon("machine-learning", "Machine Learning", "cpu", "AI / ML", "Training and model serving."),
+    soon("security", "Security", "shield", "Security", "IAM, secrets, and policy."),
   ];
 }
 

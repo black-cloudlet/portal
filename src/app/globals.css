@@ -9,23 +9,22 @@
 
 :root {
   /*
-   * A quiet, near-monochrome scheme: neutral surfaces, one soft slate accent
-   * used sparingly for links / active state, and a dark-neutral (not colored)
-   * primary button. No saturated fills anywhere.
+   * A clean console scheme (GCP-like): neutral surfaces with a blue accent for
+   * links, active nav, tabs, and the primary action.
    */
-  --blue-600: #5b6b7f; /* soft slate accent */
-  --blue-700: #48566a;
-  --blue-50: #eef1f5;
-  --green-600: #5d8a6f; /* muted, de-saturated status colors */
-  --green-50: #eef4f0;
-  --red-600: #b26a5f;
-  --red-50: #f7efec;
-  --yellow-700: #8a7a4a;
-  --yellow-50: #f5f1e6;
+  --blue-600: #1a73e8; /* primary blue accent */
+  --blue-700: #1967d2;
+  --blue-50: #e8f0fe;
+  --green-600: #188038; /* status colors */
+  --green-50: #e6f4ea;
+  --red-600: #d93025;
+  --red-50: #fce8e6;
+  --yellow-700: #b06000;
+  --yellow-50: #fef7e0;
 
-  /* Filled primary action: a dark neutral, not a brand color. */
-  --primary: #2b2d31;
-  --primary-hover: #3a3d42;
+  /* Filled primary action: the blue accent. */
+  --primary: #1a73e8;
+  --primary-hover: #1967d2;
 
   /* Clean, light neutrals with hairline borders. */
   --bg: #fafafa;
@@ -53,19 +52,19 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --blue-600: #9aa7ba;
-    --blue-700: #b3bece;
-    --blue-50: #262a30;
-    --green-600: #82ad92;
-    --green-50: #20281f;
-    --red-600: #cf9186;
-    --red-50: #2c2320;
-    --yellow-700: #cdb87f;
-    --yellow-50: #29261b;
+    --blue-600: #8ab4f8;
+    --blue-700: #aecbfa;
+    --blue-50: #1f2a3d;
+    --green-600: #81c995;
+    --green-50: #1e2b22;
+    --red-600: #f28b82;
+    --red-50: #2d2422;
+    --yellow-700: #fdd663;
+    --yellow-50: #2a2717;
 
-    /* Filled primary in dark: a near-white neutral with dark text. */
-    --primary: #ecebe8;
-    --primary-hover: #dcdbd7;
+    /* Filled primary in dark: the blue accent with dark text. */
+    --primary: #8ab4f8;
+    --primary-hover: #aecbfa;
 
     /* Quiet neutral charcoals. */
     --bg: #1c1d1f;
@@ -80,18 +79,18 @@
 }
 
 :root[data-theme="dark"] {
-  --blue-600: #9aa7ba;
-  --blue-700: #b3bece;
-  --blue-50: #262a30;
-  --green-600: #82ad92;
-  --green-50: #20281f;
-  --red-600: #cf9186;
-  --red-50: #2c2320;
-  --yellow-700: #cdb87f;
-  --yellow-50: #29261b;
+  --blue-600: #8ab4f8;
+  --blue-700: #aecbfa;
+  --blue-50: #1f2a3d;
+  --green-600: #81c995;
+  --green-50: #1e2b22;
+  --red-600: #f28b82;
+  --red-50: #2d2422;
+  --yellow-700: #fdd663;
+  --yellow-50: #2a2717;
 
-  --primary: #ecebe8;
-  --primary-hover: #dcdbd7;
+  --primary: #8ab4f8;
+  --primary-hover: #aecbfa;
 
   --bg: #1c1d1f;
   --surface: #232427;
@@ -1369,4 +1368,183 @@ code {
 .logs-toolbar .input {
   width: auto;
   flex: 0 1 240px;
+}
+
+/* ---------- Redesign: richer nav, view header, list toolbar, cards ---------- */
+
+/* Divider between Home and the service list in the rail. */
+.sidenav__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 12px;
+}
+
+/* A highlighted (active-group) card. */
+.card--current {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 1px var(--blue-600) inset;
+}
+.card__body {
+  min-width: 0;
+}
+
+/* Per-view header, e.g. "Functions" / "Functions View". */
+.viewhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+.viewhead__title {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+.viewhead__sub {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* List toolbar: view toggle + search + sort + primary action. */
+.listbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.listbar__views {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.viewbtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.viewbtn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.viewbtn--active {
+  background: var(--blue-50);
+  color: var(--blue-600);
+}
+.searchbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+.searchbox__icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.searchbox__input {
+  width: 100%;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+.searchbox__input:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px var(--blue-50);
+}
+.listbar__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.listbar__sort .input {
+  width: auto;
+  padding: 7px 10px;
+}
+.listbar__right {
+  margin-left: auto;
+}
+
+/* Workload cards (grid view). */
+.wl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.wl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+.wl-card:hover {
+  text-decoration: none;
+  border-color: var(--blue-600);
+  box-shadow: 0 1px 6px rgba(26, 115, 232, 0.18);
+}
+.wl-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wl-card__name {
+  font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wl-card__host {
+  color: var(--blue-700);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wl-card__meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.wl-card__meta dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+.wl-card__meta dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
