@@ -8,29 +8,38 @@
  */
 
 :root {
-  --blue-600: #0f766e; /* teal (primary accent) */
-  --blue-700: #115e59;
-  --blue-50: #d8f0ec;
-  --green-600: #188038;
-  --green-50: #e6f4ea;
-  --red-600: #d93025;
-  --red-50: #fce8e6;
-  /* Caution accent: a muted gold (not orange), used sparingly for warnings. */
-  --yellow-700: #7d6a00;
-  --yellow-50: #fbf6d9;
+  /*
+   * A quiet, near-monochrome scheme: neutral surfaces, one soft slate accent
+   * used sparingly for links / active state, and a dark-neutral (not colored)
+   * primary button. No saturated fills anywhere.
+   */
+  --blue-600: #5b6b7f; /* soft slate accent */
+  --blue-700: #48566a;
+  --blue-50: #eef1f5;
+  --green-600: #5d8a6f; /* muted, de-saturated status colors */
+  --green-50: #eef4f0;
+  --red-600: #b26a5f;
+  --red-50: #f7efec;
+  --yellow-700: #8a7a4a;
+  --yellow-50: #f5f1e6;
 
-  --bg: #f1f3f4;
+  /* Filled primary action: a dark neutral, not a brand color. */
+  --primary: #2b2d31;
+  --primary-hover: #3a3d42;
+
+  /* Clean, light neutrals with hairline borders. */
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #f8f9fa;
-  --border: #dadce0;
-  --text: #202124;
-  --text-muted: #5f6368;
-  /* Text/foreground color that sits on a filled primary (blue) surface. */
+  --surface-2: #f4f5f6;
+  --border: #ececef;
+  --text: #1f2328;
+  --text-muted: #6b7280;
+  /* Text/foreground color that sits on a filled primary surface. */
   --on-primary: #ffffff;
   --topbar-h: 56px;
   --sidenav-w: 260px;
   --radius: 8px;
-  --shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow: 0 1px 2px rgba(24, 28, 33, 0.08), 0 1px 2px rgba(24, 28, 33, 0.04);
 
   --font: "Google Sans", "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
@@ -44,46 +53,54 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --blue-600: #2dd4bf;
-    --blue-700: #5eead4;
-    --blue-50: #123531;
-    --green-600: #81c995;
-    --green-50: #1e2f22;
-    --red-600: #f28b82;
-    --red-50: #2e2321;
-    --yellow-700: #fdd663;
-    --yellow-50: #2d2a1a;
+    --blue-600: #9aa7ba;
+    --blue-700: #b3bece;
+    --blue-50: #262a30;
+    --green-600: #82ad92;
+    --green-50: #20281f;
+    --red-600: #cf9186;
+    --red-50: #2c2320;
+    --yellow-700: #cdb87f;
+    --yellow-50: #29261b;
 
-    --bg: #202124;
-    --surface: #292a2d;
-    --surface-2: #35363a;
-    --border: #3c4043;
-    --text: #e8eaed;
-    --text-muted: #9aa0a6;
-    --on-primary: #202124;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 1px 3px 1px rgba(0, 0, 0, 0.4);
+    /* Filled primary in dark: a near-white neutral with dark text. */
+    --primary: #ecebe8;
+    --primary-hover: #dcdbd7;
+
+    /* Quiet neutral charcoals. */
+    --bg: #1c1d1f;
+    --surface: #232427;
+    --surface-2: #2b2c30;
+    --border: #34363a;
+    --text: #e9eaec;
+    --text-muted: #9ba1a8;
+    --on-primary: #1f2328;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.32);
   }
 }
 
 :root[data-theme="dark"] {
-  --blue-600: #2dd4bf;
-  --blue-700: #5eead4;
-  --blue-50: #123531;
-  --green-600: #81c995;
-  --green-50: #1e2f22;
-  --red-600: #f28b82;
-  --red-50: #2e2321;
-  --yellow-700: #fdd663;
-  --yellow-50: #2d2a1a;
+  --blue-600: #9aa7ba;
+  --blue-700: #b3bece;
+  --blue-50: #262a30;
+  --green-600: #82ad92;
+  --green-50: #20281f;
+  --red-600: #cf9186;
+  --red-50: #2c2320;
+  --yellow-700: #cdb87f;
+  --yellow-50: #29261b;
 
-  --bg: #202124;
-  --surface: #292a2d;
-  --surface-2: #35363a;
-  --border: #3c4043;
-  --text: #e8eaed;
-  --text-muted: #9aa0a6;
-  --on-primary: #202124;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.6), 0 1px 3px 1px rgba(0, 0, 0, 0.4);
+  --primary: #ecebe8;
+  --primary-hover: #dcdbd7;
+
+  --bg: #1c1d1f;
+  --surface: #232427;
+  --surface-2: #2b2c30;
+  --border: #34363a;
+  --text: #e9eaec;
+  --text-muted: #9ba1a8;
+  --on-primary: #1f2328;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -139,11 +156,11 @@ code {
   color: var(--blue-600);
 }
 .btn--primary {
-  background: var(--blue-600);
+  background: var(--primary);
   color: var(--on-primary);
 }
 .btn--primary:hover {
-  background: var(--blue-700);
+  background: var(--primary-hover);
 }
 .btn--ghost {
   border-color: transparent;
@@ -311,8 +328,9 @@ code {
   white-space: nowrap;
 }
 .switcher__caret {
+  display: inline-flex;
+  align-items: center;
   color: var(--text-muted);
-  font-size: 10px;
 }
 
 /* ---------- Menus (shared dropdown surface) ---------- */
@@ -356,6 +374,8 @@ code {
   font-weight: 500;
 }
 .menu__check {
+  display: inline-flex;
+  align-items: center;
   width: 14px;
   color: var(--blue-600);
 }
@@ -795,6 +815,13 @@ code {
 .table tbody tr:hover {
   background: var(--surface-2);
 }
+.table__row {
+  cursor: pointer;
+}
+.table__row:focus-visible {
+  outline: 2px solid var(--blue-600);
+  outline-offset: -2px;
+}
 .table__name {
   font-weight: 500;
 }
@@ -913,6 +940,9 @@ code {
   margin-bottom: -8px;
 }
 .backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
@@ -1137,7 +1167,197 @@ code {
   border-bottom-color: var(--blue-600);
 }
 .form-panel {
-  animation: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* The HTML `hidden` attribute must win over the flex display above. */
+.form-panel[hidden] {
+  display: none;
+}
+
+/* Create dialog: the form floating over the list with a blurred backdrop. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+  background: rgba(31, 30, 29, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.modal {
+  width: 100%;
+  max-width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.modal__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.modal__close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.modal__body {
+  padding: 20px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+/* Inside the dialog the form fills the panel (its own max-width is for pages). */
+.modal__body .form {
+  max-width: none;
+}
+
+/* "Before you begin" callout at the top of the create form. */
+.form-banner {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.form-banner__icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.form-banner strong {
+  font-size: 14px;
+}
+.form-banner__text {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Two-column field grid used by the General and Scaling tabs. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+}
+.field--full {
+  grid-column: 1 / -1;
+}
+.field--hint-only {
+  gap: 0;
+}
+@media (max-width: 560px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A titled block on the Variables & Secrets tab, with an action on the right. */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-title__info {
+  display: inline-flex;
+  vertical-align: middle;
+  color: var(--text-muted);
+}
+
+/* Empty-list placeholder (no variables / no secrets yet). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty-state p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Drag-and-drop / click-to-upload target on the Files section. */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--blue-600);
+  outline: none;
+}
+.dropzone--active {
+  border-color: var(--blue-600);
+  background: var(--blue-50);
+  color: var(--blue-600);
+}
+.dropzone span {
+  font-size: 13px;
+}
+
+/* Outlined button (Add Variable / Add Secret / Add File). */
+.btn--outline {
+  border-color: var(--blue-600);
+  color: var(--blue-600);
+}
+.btn--outline:hover {
+  background: var(--blue-50);
+}
+
+/* In the modal, the footer actions sit right-aligned with Create last. */
+.form__actions--modal {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
 }
 
 /* Logs tab controls */

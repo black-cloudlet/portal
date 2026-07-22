@@ -89,6 +89,8 @@ export interface WorkloadDetail {
   // Container source.
   image?: string | null;
   registryUsername?: string | null;
+  // The port the container listens on (containers only).
+  port?: number | null;
 }
 
 export interface PodLogs {
@@ -201,6 +203,7 @@ export interface FunctionUpdateInput {
 export interface ContainerCreateInput {
   name: string;
   image: string;
+  port: number;
   registryUsername?: string | null;
   registryToken?: string | null;
   env: EnvVarInput[];
@@ -213,6 +216,7 @@ export interface ContainerCreateInput {
 
 export interface ContainerUpdateInput {
   image?: string | null;
+  port?: number | null;
   registryUsername?: string | null;
   registryToken?: string | null;
   env: EnvVarInput[];

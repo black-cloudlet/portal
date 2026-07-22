@@ -48,7 +48,13 @@ export default function SideNav({ categories }: SideNavProps) {
           <div className="sidenav__heading">{cat.category}</div>
           {cat.services.map((svc) => {
             const href = `/${svc.id}`;
-            const active = pathname === href || pathname.startsWith(`${href}/`);
+            const hasSub = Boolean(svc.subItems && svc.subItems.length > 0);
+            // A service with sub-sections highlights only its active leaf, never
+            // itself — so a sub-page doesn't light up both the parent and the
+            // child. A leaf service (no sub-list) highlights on its whole subtree.
+            const active = hasSub
+              ? pathname === href
+              : pathname === href || pathname.startsWith(`${href}/`);
             if (!svc.enabled) {
               return (
                 <span
@@ -64,7 +70,6 @@ export default function SideNav({ categories }: SideNavProps) {
                 </span>
               );
             }
-            const hasSub = Boolean(svc.subItems && svc.subItems.length > 0);
             const open = hasSub && isOpen(svc.id);
             return (
               <div key={svc.id}>

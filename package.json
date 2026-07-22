@@ -23,6 +23,11 @@
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
+  "overrides": {
+    "sharp": "^0.35.0",
+    "postcss": "^8.5.10",
+    "tar": "^7.5.19"
+  },
   "devDependencies": {
     "@types/node": "22.20.1",
     "@types/react": "19.2.17",

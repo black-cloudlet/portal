@@ -1,8 +1,15 @@
 import Link from "next/link";
 
 import ApiErrorNotice from "@/components/ApiErrorNotice";
+import WorkloadCreateDialog from "@/components/WorkloadCreateDialog";
 import WorkloadTable from "@/components/WorkloadTable";
-import { listFunctions, type WorkloadSort, type WorkloadSummary } from "@/lib/serverless";
+import {
+  getPlatformInfo,
+  listFunctions,
+  type PlatformInfo,
+  type WorkloadSort,
+  type WorkloadSummary,
+} from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Functions" };
@@ -33,6 +40,10 @@ export default async function FunctionsPage({
     fetchError = err;
   }
 
+  // The create dialog needs the platform capabilities up front; if that lookup
+  // fails, fall back to the standalone /new screen (which surfaces the error).
+  const info: PlatformInfo | null = await getPlatformInfo().catch(() => null);
+
   return (
     <div className="stack">
       <div className="toolbar">
@@ -51,9 +62,13 @@ export default async function FunctionsPage({
             Created
           </Link>
         </div>
-        <Link className="btn btn--primary" href="/serverless/functions/new">
-          + Create function
-        </Link>
+        {info ? (
+          <WorkloadCreateDialog type="function" info={info} group={activeGroup} />
+        ) : (
+          <Link className="btn btn--primary" href="/serverless/functions/new">
+            + Create function
+          </Link>
+        )}
       </div>
       {fetchError ? (
         <ApiErrorNotice error={fetchError} />
