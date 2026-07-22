@@ -1,9 +1,9 @@
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadForm from "@/components/WorkloadForm";
 import {
-  getPlatformInfo,
+  getFunctionInfo,
   getWorkload,
-  type PlatformInfo,
+  type FunctionInfo,
   type WorkloadDetail,
 } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
@@ -22,11 +22,11 @@ export default async function EditFunctionPage({ params }: { params: Promise<{ n
     return <div className="notice notice--warn">The Serverless API is not configured.</div>;
   if (!activeGroup) return <div className="notice notice--warn">You have no active group.</div>;
 
-  let info: PlatformInfo;
+  let info: FunctionInfo;
   let wl: WorkloadDetail;
   try {
     [info, wl] = await Promise.all([
-      getPlatformInfo(),
+      getFunctionInfo(),
       getWorkload("function", activeGroup, name, accessToken),
     ]);
   } catch (err) {

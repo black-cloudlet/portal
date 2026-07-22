@@ -2,12 +2,11 @@ import Link from "next/link";
 
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadCreateDialog from "@/components/WorkloadCreateDialog";
-import WorkloadTable from "@/components/WorkloadTable";
+import WorkloadList from "@/components/WorkloadList";
 import {
-  getPlatformInfo,
+  getContainerInfo,
   listContainers,
-  type PlatformInfo,
-  type WorkloadSort,
+  type ContainerInfo,
   type WorkloadSummary,
 } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
@@ -15,67 +14,45 @@ import { getServerlessContext } from "@/lib/serverless-context";
 export const metadata = { title: "Containers" };
 export const dynamic = "force-dynamic";
 
-function parseSort(v?: string): WorkloadSort {
-  return v === "createdAt" ? "createdAt" : "name";
-}
-
 /** Containers tab: the active group's containers from the Serverless API. */
-export default async function ContainersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ sort?: string }>;
-}) {
+export default async function ContainersPage() {
   const { enabled, activeGroup, accessToken } = await getServerlessContext();
   // The layout already shows the not-configured / no-group notice.
   if (!enabled || !activeGroup) return null;
 
-  const { sort } = await searchParams;
-  const activeSort = parseSort(sort);
-
   let workloads: WorkloadSummary[] | null = null;
   let fetchError: unknown = null;
   try {
-    workloads = await listContainers(activeGroup, accessToken, activeSort);
+    workloads = await listContainers(activeGroup, accessToken);
   } catch (err) {
     fetchError = err;
   }
 
   // The create dialog needs the platform capabilities up front; if that lookup
   // fails, fall back to the standalone /new screen (which surfaces the error).
-  const info: PlatformInfo | null = await getPlatformInfo().catch(() => null);
+  const info: ContainerInfo | null = await getContainerInfo().catch(() => null);
+  const create = info ? (
+    <WorkloadCreateDialog type="container" info={info} group={activeGroup} />
+  ) : (
+    <Link className="btn btn--primary" href="/serverless/containers/new">
+      <span aria-hidden="true">+</span> Create container
+    </Link>
+  );
 
   return (
     <div className="stack">
-      <div className="toolbar">
-        <div className="sortlinks">
-          <span className="text-muted">Sort:</span>
-          <Link
-            className={`sortlink${activeSort === "name" ? " sortlink--active" : ""}`}
-            href="/serverless/containers?sort=name"
-          >
-            Name
-          </Link>
-          <Link
-            className={`sortlink${activeSort === "createdAt" ? " sortlink--active" : ""}`}
-            href="/serverless/containers?sort=createdAt"
-          >
-            Created
-          </Link>
-        </div>
-        {info ? (
-          <WorkloadCreateDialog type="container" info={info} group={activeGroup} />
-        ) : (
-          <Link className="btn btn--primary" href="/serverless/containers/new">
-            + Create container
-          </Link>
-        )}
+      <div className="viewhead">
+        <h2 className="viewhead__title">Containers</h2>
+        <p className="viewhead__sub">Containers View</p>
       </div>
       {fetchError ? (
         <ApiErrorNotice error={fetchError} />
       ) : (
-        <WorkloadTable
+        <WorkloadList
           workloads={workloads ?? []}
+          type="container"
           emptyLabel={`No containers in ${activeGroup} yet.`}
+          toolbarRight={create}
         />
       )}
     </div>

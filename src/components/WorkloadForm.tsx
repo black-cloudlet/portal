@@ -105,11 +105,13 @@ export default function WorkloadForm({
   const [gitRepo, setGitRepo] = useState(initial?.gitRepo ?? "");
   const [branch, setBranch] = useState(initial?.branch ?? "main");
   const [gitToken, setGitToken] = useState("");
-  const [runtime, setRuntime] = useState(initial?.runtime ?? info.runtimes[0] ?? "");
+  const [runtime, setRuntime] = useState(initial?.runtime ?? info.runtimes?.[0] ?? "");
   const [image, setImage] = useState(initial?.image ?? "");
-  // Internal port the container listens on; default a fresh container to 8080.
+  // Internal port the container listens on. PUT is now a full replace that
+  // requires a port, so default a container with no explicit port (create, or an
+  // older container that ran on Knative's default) to 8080.
   const [port, setPort] = useState(
-    initial?.port != null ? String(initial.port) : mode === "create" && !isFn ? "8080" : "",
+    initial?.port != null ? String(initial.port) : !isFn ? "8080" : "",
   );
   const [registryUsername, setRegistryUsername] = useState(initial?.registryUsername ?? "");
   const [registryToken, setRegistryToken] = useState("");
@@ -141,7 +143,6 @@ export default function WorkloadForm({
   // Prefill the effective host on edit so saving doesn't reset a custom hostname
   // (PUT is a full replace; a blank hostname would recompute the default).
   const [hostname, setHostname] = useState(initial?.hostname ?? "");
-  const [sites, setSites] = useState<string[]>([]);
   const initScale = initial?.scaling;
   const initDelay = parseDelay(initScale?.scaleDownDelay);
   const [metric, setMetric] = useState(initScale?.metric ?? defaultMetric);
@@ -197,19 +198,19 @@ export default function WorkloadForm({
     if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
       return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
     if (isFn) {
-      if (mode === "create") {
-        if (gitRepo.trim() === "")
-          return { tab: "general", message: "Git repository is required." };
-        if (gitToken.trim() === "") return { tab: "general", message: "Git token is required." };
-      }
+      // PUT is a full replace, so the build inputs are required on edit as well
+      // as create. The git token is redacted keep-on-omit (stored server-side),
+      // so it is required only on create.
+      if (gitRepo.trim() === "") return { tab: "general", message: "Git repository is required." };
+      if (runtime.trim() === "") return { tab: "general", message: "Runtime is required." };
+      if (mode === "create" && gitToken.trim() === "")
+        return { tab: "general", message: "Git token is required." };
     } else {
-      if (mode === "create" && image.trim() === "")
-        return { tab: "general", message: "Image is required." };
+      // Full replace: image and port are required on edit as well as create.
+      if (image.trim() === "") return { tab: "general", message: "Image is required." };
       const portNum = Number(port);
-      if (mode === "create" && (port.trim() === "" || !Number.isInteger(portNum) || portNum < 1))
-        return { tab: "general", message: "A valid internal port number is required." };
-      if (port.trim() !== "" && (!Number.isInteger(portNum) || portNum < 1))
-        return { tab: "general", message: "The internal port must be a positive whole number." };
+      if (port.trim() === "" || !Number.isInteger(portNum) || portNum < 1 || portNum > 65535)
+        return { tab: "general", message: "A valid internal port (1–65535) is required." };
       const hasUser = registryUsername.trim() !== "";
       const hasToken = registryToken.trim() !== "";
       // A token always needs a username; on create the two are all-or-nothing
@@ -260,7 +261,8 @@ export default function WorkloadForm({
     startTransition(async () => {
       let res: ActionError | void;
       if (mode === "create") {
-        const sitesVal = sites.length ? sites : null;
+        // Placement is always cluster-wide: send no sites so the API deploys to
+        // every site (the console does not expose per-site targeting).
         if (isFn) {
           const spec: FunctionCreateInput = {
             name,
@@ -268,7 +270,7 @@ export default function WorkloadForm({
             branch: branch || "main",
             gitToken,
             runtime,
-            sites: sitesVal,
+            sites: null,
             ...common,
           };
           res = await createWorkloadAction("function", spec);
@@ -279,27 +281,30 @@ export default function WorkloadForm({
             port: Number(port),
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
-            sites: sitesVal,
+            sites: null,
             ...common,
           };
           res = await createWorkloadAction("container", spec);
         }
       } else if (isFn) {
         const spec: FunctionUpdateInput = {
-          // Build inputs are always sent (unchanged values are a no-op); the
-          // stored git token rebuilds on a change. A token is sent only to rotate.
-          gitRepo: gitRepo || null,
-          branch: branch || null,
-          runtime: runtime || null,
+          // Full replace: the build inputs are the complete desired state and are
+          // always sent. The API rebuilds only when one actually changes (or the
+          // token is rotated), so re-sending unchanged values is a no-op. branch
+          // defaults to main; the git token is sent only to rotate it.
+          gitRepo,
+          branch: branch.trim() || "main",
+          runtime,
           gitToken: gitToken.trim() || null,
           ...common,
         };
         res = await updateWorkloadAction("function", initial!.name, spec);
       } else {
         const spec: ContainerUpdateInput = {
+          // Full replace: image and port are the complete desired state.
           // Registry: username+token rotates, username-only keeps, neither removes.
-          image: image.trim() || null,
-          port: port.trim() === "" ? null : Number(port),
+          image: image.trim(),
+          port: Number(port),
           registryUsername: registryUsername.trim() || null,
           registryToken: registryToken.trim() || null,
           ...common,
@@ -310,13 +315,14 @@ export default function WorkloadForm({
     });
   }
 
-  const hostPreview =
-    hostname.trim() === "" && name.trim() !== ""
-      ? info.defaultHostTemplate
-          .replace("{name}", name.trim())
-          .replace("{group}", group)
-          .replace("{routeDomain}", info.routeDomain)
-      : null;
+  // The host the API generates when no custom hostname is given, derived from
+  // /info's template. Shown as the hostname placeholder and (before a name is
+  // typed) as a hint under the Name field.
+  const generatedHost = info.defaultHostTemplate
+    .replace("{name}", name.trim() || "{name}")
+    .replace("{group}", group)
+    .replace("{routeDomain}", info.routeDomain);
+  const hostPreview = hostname.trim() === "" && name.trim() !== "" ? generatedHost : null;
 
   const cancelHref = isEdit ? `/serverless/${seg}/${initial!.name}` : `/serverless/${seg}`;
 
@@ -428,7 +434,7 @@ export default function WorkloadForm({
                   value={runtime}
                   onChange={(e) => setRuntime(e.target.value)}
                 >
-                  {info.runtimes.map((r) => (
+                  {(info.runtimes ?? []).map((r) => (
                     <option key={r} value={r}>
                       {r}
                     </option>
@@ -455,7 +461,7 @@ export default function WorkloadForm({
                   className="input"
                   value={image}
                   onChange={(e) => setImage(e.target.value)}
-                  placeholder="registry.internal/team/app:latest"
+                  placeholder="Registry path"
                 />
               </label>
               <label className="field">
@@ -514,36 +520,15 @@ export default function WorkloadForm({
             </select>
           </label>
           <label className="field">
-            <span className="field__label">Custom hostname (optional)</span>
+            <span className="field__label">Hostname (optional)</span>
             <input
               className="input"
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
-              placeholder="defaults to the generated host"
+              placeholder={generatedHost}
             />
+            <span className="field__hint">Leave blank to use the generated host.</span>
           </label>
-
-          {mode === "create" && info.sites.length > 0 && (
-            <div className="field field--full">
-              <span className="field__label">Sites (none selected = all)</span>
-              <div className="checks">
-                {info.sites.map((s) => (
-                  <label key={s} className="check">
-                    <input
-                      type="checkbox"
-                      checked={sites.includes(s)}
-                      onChange={(e) =>
-                        setSites((prev) =>
-                          e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
-                        )
-                      }
-                    />
-                    {s}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

@@ -1,4 +1,3 @@
-import { getPlatformInfo, type PlatformInfo } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Serverless" };
@@ -7,16 +6,14 @@ export const metadata = { title: "Serverless" };
 export const dynamic = "force-dynamic";
 
 /**
- * The Serverless offering shell: a shared header and the platform-capability
- * chips. The Containers/Functions sub-sections are reached from the left-nav
- * (see SideNav / lib/services `subItems`); the active sub-section's page renders
- * as `children`. When the offering isn't configured or the user has no group,
- * the shell shows a notice (the sub-pages guard the same way, so they render
- * nothing in that case).
+ * The Serverless offering shell: a shared header. The Containers/Functions
+ * sub-sections are reached from the left-nav (see SideNav / lib/services
+ * `subItems`); the active sub-section's page renders as `children`. When the
+ * offering isn't configured or the user has no group, the shell shows a notice
+ * (the sub-pages guard the same way, so they render nothing in that case).
  */
 export default async function ServerlessLayout({ children }: { children: React.ReactNode }) {
   const { enabled, activeGroup } = await getServerlessContext();
-  const info: PlatformInfo | null = enabled ? await getPlatformInfo().catch(() => null) : null;
 
   return (
     <div className="page">
@@ -39,17 +36,7 @@ export default async function ServerlessLayout({ children }: { children: React.R
           You have no group membership, so there are no workloads to show.
         </div>
       ) : (
-        <>
-          {info && (
-            <div className="chips">
-              <span className="chip">API v{info.version}</span>
-              <span className="chip">Sites: {info.sites.join(", ") || "—"}</span>
-              <span className="chip">Runtimes: {info.runtimes.join(", ") || "—"}</span>
-              <span className="chip">Domain: {info.routeDomain}</span>
-            </div>
-          )}
-          {children}
-        </>
+        children
       )}
     </div>
   );
