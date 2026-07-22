@@ -42,6 +42,15 @@ const ICONS: Record<string, ReactNode> = {
       <path d="m8 6-6 6 6 6" />
     </>
   ),
+  // Confirmation check (e.g. active item in a menu).
+  check: <path d="M20 6 9 17l-5-5" />,
+  // Back navigation.
+  "arrow-left": (
+    <>
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />

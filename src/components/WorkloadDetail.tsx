@@ -3,6 +3,7 @@ import Link from "next/link";
 import ApiErrorNotice from "@/components/ApiErrorNotice";
 import AutoRefresh from "@/components/AutoRefresh";
 import DeleteWorkloadButton from "@/components/DeleteWorkloadButton";
+import Icon from "@/components/Icon";
 import LogsToolbar from "@/components/LogsToolbar";
 import StatusPill from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
@@ -62,7 +63,8 @@ export default async function WorkloadDetail({
       <div className="detail">
         <div className="detail__bar">
           <Link className="backlink" href={`/serverless/${seg}`}>
-            ← Back to {seg}
+            <Icon name="arrow-left" size={14} />
+            Back to {seg}
           </Link>
         </div>
         <ApiErrorNotice error={err} />

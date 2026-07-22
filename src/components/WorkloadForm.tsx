@@ -326,7 +326,8 @@ export default function WorkloadForm({
         <>
           <div className="detail__bar">
             <Link className="backlink" href={cancelHref}>
-              ← Cancel
+              <Icon name="arrow-left" size={14} />
+              Cancel
             </Link>
           </div>
 

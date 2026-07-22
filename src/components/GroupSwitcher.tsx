@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import Icon from "@/components/Icon";
+
 interface GroupSwitcherProps {
   groups: string[];
   activeGroup: string | null;
@@ -64,7 +66,7 @@ export default function GroupSwitcher({ groups, activeGroup }: GroupSwitcherProp
         <span className="switcher__label">Group</span>
         <span className="switcher__value">{activeGroup ?? "Select"}</span>
         <span className="switcher__caret" aria-hidden="true">
-          ▾
+          <Icon name="chevron-down" size={14} />
         </span>
       </button>
       {open && (
@@ -77,7 +79,7 @@ export default function GroupSwitcher({ groups, activeGroup }: GroupSwitcherProp
                 disabled={pending !== null}
               >
                 <span className="menu__check" aria-hidden="true">
-                  {g === activeGroup ? "✓" : ""}
+                  {g === activeGroup && <Icon name="check" size={14} />}
                 </span>
                 {g}
                 {pending === g && <span className="menu__spinner" aria-hidden="true" />}

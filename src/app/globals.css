@@ -328,8 +328,9 @@ code {
   white-space: nowrap;
 }
 .switcher__caret {
+  display: inline-flex;
+  align-items: center;
   color: var(--text-muted);
-  font-size: 10px;
 }
 
 /* ---------- Menus (shared dropdown surface) ---------- */
@@ -373,6 +374,8 @@ code {
   font-weight: 500;
 }
 .menu__check {
+  display: inline-flex;
+  align-items: center;
   width: 14px;
   color: var(--blue-600);
 }
@@ -937,6 +940,9 @@ code {
   margin-bottom: -8px;
 }
 .backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
