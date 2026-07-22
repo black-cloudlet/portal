@@ -8,31 +8,38 @@
  */
 
 :root {
-  /* Primary accent: the Claude "clay" coral, matching the Claude Code web UI. */
-  --blue-600: #c96442;
-  --blue-700: #b0512f;
-  --blue-50: #f6ece7;
-  --green-600: #2e7d55;
-  --green-50: #e7f2ec;
-  --red-600: #c0392b;
-  --red-50: #faeae7;
-  /* Caution accent: a muted gold (not orange), used sparingly for warnings. */
-  --yellow-700: #8a6d00;
-  --yellow-50: #f7f0d8;
+  /*
+   * A quiet, near-monochrome scheme: neutral surfaces, one soft slate accent
+   * used sparingly for links / active state, and a dark-neutral (not colored)
+   * primary button. No saturated fills anywhere.
+   */
+  --blue-600: #5b6b7f; /* soft slate accent */
+  --blue-700: #48566a;
+  --blue-50: #eef1f5;
+  --green-600: #5d8a6f; /* muted, de-saturated status colors */
+  --green-50: #eef4f0;
+  --red-600: #b26a5f;
+  --red-50: #f7efec;
+  --yellow-700: #8a7a4a;
+  --yellow-50: #f5f1e6;
 
-  /* Warm, paper-toned neutrals (Claude Code look) rather than cool grays. */
-  --bg: #f5f4ef;
+  /* Filled primary action: a dark neutral, not a brand color. */
+  --primary: #2b2d31;
+  --primary-hover: #3a3d42;
+
+  /* Clean, light neutrals with hairline borders. */
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #efece4;
-  --border: #e4dfd4;
-  --text: #1f1e1d;
-  --text-muted: #6b6760;
-  /* Text/foreground color that sits on a filled primary (coral) surface. */
+  --surface-2: #f4f5f6;
+  --border: #ececef;
+  --text: #1f2328;
+  --text-muted: #6b7280;
+  /* Text/foreground color that sits on a filled primary surface. */
   --on-primary: #ffffff;
   --topbar-h: 56px;
   --sidenav-w: 260px;
   --radius: 8px;
-  --shadow: 0 1px 2px rgba(50, 45, 40, 0.16), 0 1px 3px 1px rgba(50, 45, 40, 0.08);
+  --shadow: 0 1px 2px rgba(24, 28, 33, 0.08), 0 1px 2px rgba(24, 28, 33, 0.04);
 
   --font: "Google Sans", "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
@@ -46,47 +53,54 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --blue-600: #e0876a;
-    --blue-700: #eb9f85;
-    --blue-50: #3a2a22;
-    --green-600: #7fbf98;
-    --green-50: #22301f;
-    --red-600: #e88b7f;
-    --red-50: #33231f;
-    --yellow-700: #e6c86a;
-    --yellow-50: #2f2a1a;
+    --blue-600: #9aa7ba;
+    --blue-700: #b3bece;
+    --blue-50: #262a30;
+    --green-600: #82ad92;
+    --green-50: #20281f;
+    --red-600: #cf9186;
+    --red-50: #2c2320;
+    --yellow-700: #cdb87f;
+    --yellow-50: #29261b;
 
-    /* Warm charcoal surfaces to match the Claude Code dark UI. */
-    --bg: #262624;
-    --surface: #30302e;
-    --surface-2: #3a3937;
-    --border: #4a4844;
-    --text: #ecebe6;
-    --text-muted: #b0aca3;
-    --on-primary: #1f1e1d;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 1px 3px 1px rgba(0, 0, 0, 0.38);
+    /* Filled primary in dark: a near-white neutral with dark text. */
+    --primary: #ecebe8;
+    --primary-hover: #dcdbd7;
+
+    /* Quiet neutral charcoals. */
+    --bg: #1c1d1f;
+    --surface: #232427;
+    --surface-2: #2b2c30;
+    --border: #34363a;
+    --text: #e9eaec;
+    --text-muted: #9ba1a8;
+    --on-primary: #1f2328;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.32);
   }
 }
 
 :root[data-theme="dark"] {
-  --blue-600: #e0876a;
-  --blue-700: #eb9f85;
-  --blue-50: #3a2a22;
-  --green-600: #7fbf98;
-  --green-50: #22301f;
-  --red-600: #e88b7f;
-  --red-50: #33231f;
-  --yellow-700: #e6c86a;
-  --yellow-50: #2f2a1a;
+  --blue-600: #9aa7ba;
+  --blue-700: #b3bece;
+  --blue-50: #262a30;
+  --green-600: #82ad92;
+  --green-50: #20281f;
+  --red-600: #cf9186;
+  --red-50: #2c2320;
+  --yellow-700: #cdb87f;
+  --yellow-50: #29261b;
 
-  --bg: #262624;
-  --surface: #30302e;
-  --surface-2: #3a3937;
-  --border: #4a4844;
-  --text: #ecebe6;
-  --text-muted: #b0aca3;
-  --on-primary: #1f1e1d;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 1px 3px 1px rgba(0, 0, 0, 0.38);
+  --primary: #ecebe8;
+  --primary-hover: #dcdbd7;
+
+  --bg: #1c1d1f;
+  --surface: #232427;
+  --surface-2: #2b2c30;
+  --border: #34363a;
+  --text: #e9eaec;
+  --text-muted: #9ba1a8;
+  --on-primary: #1f2328;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.32);
 }
 
 * {
@@ -142,11 +156,11 @@ code {
   color: var(--blue-600);
 }
 .btn--primary {
-  background: var(--blue-600);
+  background: var(--primary);
   color: var(--on-primary);
 }
 .btn--primary:hover {
-  background: var(--blue-700);
+  background: var(--primary-hover);
 }
 .btn--ghost {
   border-color: transparent;
@@ -1223,14 +1237,13 @@ code {
   display: flex;
   gap: 12px;
   padding: 12px 16px;
-  border: 1px solid var(--blue-600);
-  border-left-width: 4px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--blue-50);
+  background: var(--surface-2);
 }
 .form-banner__icon {
   flex-shrink: 0;
-  color: var(--blue-600);
+  color: var(--text-muted);
   margin-top: 1px;
 }
 .form-banner strong {
