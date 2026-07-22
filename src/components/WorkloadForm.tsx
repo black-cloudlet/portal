@@ -107,6 +107,10 @@ export default function WorkloadForm({
   const [gitToken, setGitToken] = useState("");
   const [runtime, setRuntime] = useState(initial?.runtime ?? info.runtimes[0] ?? "");
   const [image, setImage] = useState(initial?.image ?? "");
+  // Internal port the container listens on; default a fresh container to 8080.
+  const [port, setPort] = useState(
+    initial?.port != null ? String(initial.port) : mode === "create" && !isFn ? "8080" : "",
+  );
   const [registryUsername, setRegistryUsername] = useState(initial?.registryUsername ?? "");
   const [registryToken, setRegistryToken] = useState("");
 
@@ -201,6 +205,11 @@ export default function WorkloadForm({
     } else {
       if (mode === "create" && image.trim() === "")
         return { tab: "general", message: "Image is required." };
+      const portNum = Number(port);
+      if (mode === "create" && (port.trim() === "" || !Number.isInteger(portNum) || portNum < 1))
+        return { tab: "general", message: "A valid internal port number is required." };
+      if (port.trim() !== "" && (!Number.isInteger(portNum) || portNum < 1))
+        return { tab: "general", message: "The internal port must be a positive whole number." };
       const hasUser = registryUsername.trim() !== "";
       const hasToken = registryToken.trim() !== "";
       // A token always needs a username; on create the two are all-or-nothing
@@ -267,6 +276,7 @@ export default function WorkloadForm({
           const spec: ContainerCreateInput = {
             name,
             image,
+            port: Number(port),
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
             sites: sitesVal,
@@ -289,6 +299,7 @@ export default function WorkloadForm({
         const spec: ContainerUpdateInput = {
           // Registry: username+token rotates, username-only keeps, neither removes.
           image: image.trim() || null,
+          port: port.trim() === "" ? null : Number(port),
           registryUsername: registryUsername.trim() || null,
           registryToken: registryToken.trim() || null,
           ...common,
@@ -444,6 +455,18 @@ export default function WorkloadForm({
                   value={image}
                   onChange={(e) => setImage(e.target.value)}
                   placeholder="registry.internal/team/app:latest"
+                />
+              </label>
+              <label className="field">
+                <span className="field__label">Internal Port Number*</span>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={port}
+                  onChange={(e) => setPort(e.target.value)}
+                  placeholder="8080"
                 />
               </label>
               <label className="field">

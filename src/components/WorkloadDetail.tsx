@@ -169,6 +169,10 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                 <dd>{wl.image ?? "—"}</dd>
               </div>
               <div>
+                <dt>Port</dt>
+                <dd>{wl.port ?? "—"}</dd>
+              </div>
+              <div>
                 <dt>Registry user</dt>
                 <dd>{wl.registryUsername ?? "— (public)"}</dd>
               </div>
