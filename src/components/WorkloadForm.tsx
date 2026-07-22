@@ -202,8 +202,7 @@ export default function WorkloadForm({
       // PUT is a full replace, so the build inputs are required on edit as well
       // as create. The git token is redacted keep-on-omit (stored server-side),
       // so it is required only on create.
-      if (gitRepo.trim() === "")
-        return { tab: "general", message: "Git repository is required." };
+      if (gitRepo.trim() === "") return { tab: "general", message: "Git repository is required." };
       if (runtime.trim() === "") return { tab: "general", message: "Runtime is required." };
       if (mode === "create" && gitToken.trim() === "")
         return { tab: "general", message: "Git token is required." };
@@ -211,12 +210,7 @@ export default function WorkloadForm({
       // Full replace: image and port are required on edit as well as create.
       if (image.trim() === "") return { tab: "general", message: "Image is required." };
       const portNum = Number(port);
-      if (
-        port.trim() === "" ||
-        !Number.isInteger(portNum) ||
-        portNum < 1 ||
-        portNum > 65535
-      )
+      if (port.trim() === "" || !Number.isInteger(portNum) || portNum < 1 || portNum > 65535)
         return { tab: "general", message: "A valid internal port (1–65535) is required." };
       const hasUser = registryUsername.trim() !== "";
       const hasToken = registryToken.trim() !== "";
