@@ -27,6 +27,11 @@ ENV NODE_ENV=production \
     PORTAL_PORT=3000 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
+# The standalone server runs via `node server.js` and needs no package manager.
+# Drop the base image's bundled npm/npx/corepack so their vendored deps (e.g.
+# npm's own tar) don't show up in the image vulnerability scan.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 # The standalone output bundles only the server + pruned node_modules.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
