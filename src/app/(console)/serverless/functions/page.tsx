@@ -4,9 +4,9 @@ import ApiErrorNotice from "@/components/ApiErrorNotice";
 import WorkloadCreateDialog from "@/components/WorkloadCreateDialog";
 import WorkloadTable from "@/components/WorkloadTable";
 import {
-  getPlatformInfo,
+  getFunctionInfo,
   listFunctions,
-  type PlatformInfo,
+  type FunctionInfo,
   type WorkloadSort,
   type WorkloadSummary,
 } from "@/lib/serverless";
@@ -42,7 +42,7 @@ export default async function FunctionsPage({
 
   // The create dialog needs the platform capabilities up front; if that lookup
   // fails, fall back to the standalone /new screen (which surfaces the error).
-  const info: PlatformInfo | null = await getPlatformInfo().catch(() => null);
+  const info: FunctionInfo | null = await getFunctionInfo().catch(() => null);
 
   return (
     <div className="stack">

@@ -136,14 +136,41 @@ export interface ScalingCapabilities {
   scaleDownDelay: ScaleDownDelayCapability;
 }
 
-export interface PlatformInfo {
+/** The container `port` field's rules (from `GET .../containers/info`). */
+export interface PortCapability {
+  required: boolean;
+  min: number;
+  max: number;
+}
+
+/** Platform capabilities common to both offerings (see api/models/info.py BaseInfo). */
+export interface BasePlatformInfo {
   version: string;
   sites: string[];
-  runtimes: string[];
   sizes: string[];
   scaling: ScalingCapabilities;
   routeDomain: string;
   defaultHostTemplate: string;
+}
+
+/** Container capabilities (`GET /api/v1/containers/info`): the base plus the port rules. */
+export interface ContainerInfo extends BasePlatformInfo {
+  port: PortCapability;
+}
+
+/** Function capabilities (`GET /api/v1/functions/info`): the base plus the runtimes. */
+export interface FunctionInfo extends BasePlatformInfo {
+  runtimes: string[];
+}
+
+/**
+ * The capabilities the shared create/edit form consumes. Both per-offering
+ * documents are assignable to it: `runtimes` is returned only for functions and
+ * `port` only for containers, so each is optional here.
+ */
+export interface PlatformInfo extends BasePlatformInfo {
+  runtimes?: string[];
+  port?: PortCapability;
 }
 
 /* ---------- Request inputs (create/update bodies) ---------- */
@@ -189,10 +216,14 @@ export interface FunctionCreateInput {
 }
 
 export interface FunctionUpdateInput {
-  gitRepo?: string | null;
-  branch?: string | null;
+  // Full replace: the build inputs are the complete desired state. gitRepo and
+  // runtime are required (like create); branch defaults to "main". Only the git
+  // token is keep-on-omit (redacted, can't be read back) - blank keeps the
+  // stored one, a value rotates it.
+  gitRepo: string;
+  branch: string;
   gitToken?: string | null;
-  runtime?: string | null;
+  runtime: string;
   env: EnvVarInput[];
   files: FileInput[];
   scaling: ScalingInput;
@@ -215,8 +246,11 @@ export interface ContainerCreateInput {
 }
 
 export interface ContainerUpdateInput {
-  image?: string | null;
-  port?: number | null;
+  // Full replace: image and port are the complete desired state, so both are
+  // required (like create). The only keep-on-omit is the redacted registry
+  // token (see the registry-creds semantics in the form).
+  image: string;
+  port: number;
   registryUsername?: string | null;
   registryToken?: string | null;
   env: EnvVarInput[];
@@ -344,9 +378,14 @@ async function toApiError(resp: Response, path: string): Promise<ServerlessApiEr
   );
 }
 
-/** Public platform capabilities (`GET /api/v1/info`); no auth required. */
-export function getPlatformInfo(): Promise<PlatformInfo> {
-  return apiGet<PlatformInfo>("/api/v1/info", undefined);
+/** Public container capabilities (`GET /api/v1/containers/info`); no auth required. */
+export function getContainerInfo(): Promise<ContainerInfo> {
+  return apiGet<ContainerInfo>("/api/v1/containers/info", undefined);
+}
+
+/** Public function capabilities (`GET /api/v1/functions/info`); no auth required. */
+export function getFunctionInfo(): Promise<FunctionInfo> {
+  return apiGet<FunctionInfo>("/api/v1/functions/info", undefined);
 }
 
 /** Sort keys the list endpoints accept. */

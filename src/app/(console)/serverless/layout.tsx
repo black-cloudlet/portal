@@ -1,4 +1,4 @@
-import { getPlatformInfo, type PlatformInfo } from "@/lib/serverless";
+import { getFunctionInfo, type FunctionInfo } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
 export const metadata = { title: "Serverless" };
@@ -16,7 +16,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function ServerlessLayout({ children }: { children: React.ReactNode }) {
   const { enabled, activeGroup } = await getServerlessContext();
-  const info: PlatformInfo | null = enabled ? await getPlatformInfo().catch(() => null) : null;
+  // The offering shell's capability chips include the function runtimes, which
+  // now live on the functions info document (the /info split, api/routers/info.py).
+  const info: FunctionInfo | null = enabled ? await getFunctionInfo().catch(() => null) : null;
 
   return (
     <div className="page">
