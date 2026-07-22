@@ -143,7 +143,6 @@ export default function WorkloadForm({
   // Prefill the effective host on edit so saving doesn't reset a custom hostname
   // (PUT is a full replace; a blank hostname would recompute the default).
   const [hostname, setHostname] = useState(initial?.hostname ?? "");
-  const [sites, setSites] = useState<string[]>([]);
   const initScale = initial?.scaling;
   const initDelay = parseDelay(initScale?.scaleDownDelay);
   const [metric, setMetric] = useState(initScale?.metric ?? defaultMetric);
@@ -262,7 +261,8 @@ export default function WorkloadForm({
     startTransition(async () => {
       let res: ActionError | void;
       if (mode === "create") {
-        const sitesVal = sites.length ? sites : null;
+        // Placement is always cluster-wide: send no sites so the API deploys to
+        // every site (the console does not expose per-site targeting).
         if (isFn) {
           const spec: FunctionCreateInput = {
             name,
@@ -270,7 +270,7 @@ export default function WorkloadForm({
             branch: branch || "main",
             gitToken,
             runtime,
-            sites: sitesVal,
+            sites: null,
             ...common,
           };
           res = await createWorkloadAction("function", spec);
@@ -281,7 +281,7 @@ export default function WorkloadForm({
             port: Number(port),
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
-            sites: sitesVal,
+            sites: null,
             ...common,
           };
           res = await createWorkloadAction("container", spec);
@@ -315,13 +315,14 @@ export default function WorkloadForm({
     });
   }
 
-  const hostPreview =
-    hostname.trim() === "" && name.trim() !== ""
-      ? info.defaultHostTemplate
-          .replace("{name}", name.trim())
-          .replace("{group}", group)
-          .replace("{routeDomain}", info.routeDomain)
-      : null;
+  // The host the API generates when no custom hostname is given, derived from
+  // /info's template. Shown as the hostname placeholder and (before a name is
+  // typed) as a hint under the Name field.
+  const generatedHost = info.defaultHostTemplate
+    .replace("{name}", name.trim() || "{name}")
+    .replace("{group}", group)
+    .replace("{routeDomain}", info.routeDomain);
+  const hostPreview = hostname.trim() === "" && name.trim() !== "" ? generatedHost : null;
 
   const cancelHref = isEdit ? `/serverless/${seg}/${initial!.name}` : `/serverless/${seg}`;
 
@@ -460,7 +461,7 @@ export default function WorkloadForm({
                   className="input"
                   value={image}
                   onChange={(e) => setImage(e.target.value)}
-                  placeholder="registry.internal/team/app:latest"
+                  placeholder="Registry path"
                 />
               </label>
               <label className="field">
@@ -519,36 +520,15 @@ export default function WorkloadForm({
             </select>
           </label>
           <label className="field">
-            <span className="field__label">Custom hostname (optional)</span>
+            <span className="field__label">Hostname (optional)</span>
             <input
               className="input"
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
-              placeholder="defaults to the generated host"
+              placeholder={generatedHost}
             />
+            <span className="field__hint">Leave blank to use the generated host.</span>
           </label>
-
-          {mode === "create" && info.sites.length > 0 && (
-            <div className="field field--full">
-              <span className="field__label">Sites (none selected = all)</span>
-              <div className="checks">
-                {info.sites.map((s) => (
-                  <label key={s} className="check">
-                    <input
-                      type="checkbox"
-                      checked={sites.includes(s)}
-                      onChange={(e) =>
-                        setSites((prev) =>
-                          e.target.checked ? [...prev, s] : prev.filter((x) => x !== s),
-                        )
-                      }
-                    />
-                    {s}
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
