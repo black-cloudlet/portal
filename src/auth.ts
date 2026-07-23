@@ -67,6 +67,13 @@ function resolveGroups(
   ]);
 }
 
+/**
+ * The `session.error` value meaning the access token could not be refreshed
+ * (the refresh token expired or the refresh call failed), so the session's
+ * stale token is no longer usable downstream and the user must sign in again.
+ */
+export const REAUTH_ERROR = "RefreshAccessTokenError";
+
 /** Refresh the access token via the Keycloak token endpoint (rotation). */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
@@ -93,7 +100,7 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
     };
   } catch {
     // Surface a re-auth signal to the UI rather than silently 401-ing later.
-    return { ...token, error: "RefreshAccessTokenError" };
+    return { ...token, error: REAUTH_ERROR };
   }
 }
 
