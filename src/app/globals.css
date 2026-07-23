@@ -208,6 +208,11 @@ code {
   width: 100%;
   padding: 12px;
 }
+.login__notice {
+  margin: 0 0 20px;
+  text-align: left;
+  font-size: 13px;
+}
 .login__hint {
   margin-top: 16px;
   font-size: 12px;
