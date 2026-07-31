@@ -20,6 +20,16 @@ import { getServerlessContext } from "@/lib/serverless-context";
 const PENDING_STATUSES = new Set(["Pending", "Deploying", "Terminating"]);
 const TAB_IDS: DetailTab[] = ["status", "variables", "secrets", "files", "advanced", "logs"];
 
+/**
+ * Some log sources hand back their text with escaped newline sequences (a
+ * literal "\n" rather than a real line break), which collapses the whole log
+ * onto one line. Turn escaped CR/LF sequences — and any real CRLF — into plain
+ * "\n" so the <pre> lays the log out one entry per line.
+ */
+function normalizeLogText(s: string): string {
+  return s.replace(/\r\n?/g, "\n").replace(/\\r\\n|\\n|\\r/g, "\n");
+}
+
 /** Show the API's naive local timestamp as-is (no timezone math). */
 function fmtDate(v: string | null | undefined): string {
   if (!v) return "—";
@@ -76,7 +86,7 @@ export default async function WorkloadDetail({
 
   return (
     <div className="detail">
-      <AutoRefresh active={PENDING_STATUSES.has(wl.overallStatus)} />
+      <AutoRefresh intervalMs={PENDING_STATUSES.has(wl.overallStatus) ? 5000 : 15000} />
 
       <div className="detail__bar">
         <Link className="backlink" href={`/serverless/${seg}`}>
@@ -413,7 +423,9 @@ async function LogsPanel({
                 {p.revision && <span className="pill pill--muted">{p.revision}</span>}
               </span>
             </div>
-            <pre className="code-block code-block--logs">{p.logs || "(empty)"}</pre>
+            <pre className="code-block code-block--logs">
+              {p.logs ? normalizeLogText(p.logs) : "(empty)"}
+            </pre>
           </div>
         ))
       )}

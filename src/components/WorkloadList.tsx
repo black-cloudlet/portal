@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 
+import AutoRefresh from "@/components/AutoRefresh";
 import Icon from "@/components/Icon";
 import StatusPill from "@/components/StatusPill";
 import { typeSegment, type WorkloadSummary, type WorkloadType } from "@/lib/serverless";
@@ -59,6 +60,8 @@ export default function WorkloadList({
 
   return (
     <div className="stack">
+      {/* Keep the list fresh (new workloads, status changes) without a manual reload. */}
+      <AutoRefresh intervalMs={15000} />
       <div className="listbar">
         <div className="listbar__views" role="group" aria-label="View">
           <button
