@@ -423,7 +423,9 @@ async function LogsPanel({
                 {p.revision && <span className="pill pill--muted">{p.revision}</span>}
               </span>
             </div>
-            <pre className="code-block code-block--logs">{p.logs ? normalizeLogText(p.logs) : "(empty)"}</pre>
+            <pre className="code-block code-block--logs">
+              {p.logs ? normalizeLogText(p.logs) : "(empty)"}
+            </pre>
           </div>
         ))
       )}
