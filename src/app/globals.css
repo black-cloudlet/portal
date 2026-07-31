@@ -1052,7 +1052,7 @@ code {
 .code-block--logs {
   max-height: 420px;
   overflow-y: auto;
-  white-space: pre;
+  white-space: pre-wrap;
 }
 
 /* Forms */
