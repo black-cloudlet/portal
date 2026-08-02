@@ -84,13 +84,29 @@ export interface WorkloadDetail {
   files: FileView[];
   // Function source (functions deal in source, never images).
   runtime?: string | null;
+  // The requested language version, or null when the function took the runtime's
+  // default (that default is on GET .../functions/info as `defaultVersion`).
+  version?: string | null;
   gitRepo?: string | null;
   branch?: string | null;
+  // Sub-directory inside the repo the function is built from; null/"" is the root.
+  path?: string | null;
+  // The function's image build state on the local site (kpack). Absent on a site
+  // that has never built it.
+  build?: BuildStatusView | null;
   // Container source.
   image?: string | null;
   registryUsername?: string | null;
   // The port the container listens on (containers only).
   port?: number | null;
+}
+
+/** A function's image build state (kpack), from `FunctionResponse.build`. */
+export interface BuildStatusView {
+  // Building / Ready / Failed / Unknown.
+  state: string;
+  // Why the build failed, when it did.
+  message: string | null;
 }
 
 export interface PodLogs {
@@ -143,7 +159,43 @@ export interface PortCapability {
   max: number;
 }
 
-/** Platform capabilities common to both offerings (see api/models/info.py BaseInfo). */
+/** One runtime a function may be built with, plus the versions it offers. */
+export interface RuntimeCapability {
+  // The value to send as `runtime`.
+  name: string;
+  // Selectable language versions; empty when the runtime pins one.
+  versions: string[];
+  // Applied when the caller picks no version.
+  defaultVersion: string | null;
+}
+
+/** The status strings a response can carry, so a client hardcodes none. */
+export interface StatusVocabulary {
+  // Values of `overallStatus` a poller switches on.
+  workload: string[];
+  // Values of a per-site `status` inside `sites[]`.
+  site: string[];
+  // The subset of `workload` a poller should stop on; anything else is in flight.
+  terminal: string[];
+}
+
+/** One machine-readable error code and the HTTP status carrying it. */
+export interface ErrorCode {
+  code: string;
+  status: number;
+}
+
+/** The combined limit on `name` and `group` (their join becomes the object name). */
+export interface NamingRule {
+  template: string;
+  maxLength: number;
+}
+
+/**
+ * Platform capabilities common to both offerings (see api/models/info.py BaseInfo).
+ * `statuses`, `errorCodes`, and `naming` are newer additions; typed optional so
+ * the console still works against an API that predates them.
+ */
 export interface BasePlatformInfo {
   version: string;
   sites: string[];
@@ -151,6 +203,9 @@ export interface BasePlatformInfo {
   scaling: ScalingCapabilities;
   routeDomain: string;
   defaultHostTemplate: string;
+  statuses?: StatusVocabulary;
+  errorCodes?: ErrorCode[];
+  naming?: NamingRule;
 }
 
 /** Container capabilities (`GET /api/v1/containers/info`): the base plus the port rules. */
@@ -160,7 +215,7 @@ export interface ContainerInfo extends BasePlatformInfo {
 
 /** Function capabilities (`GET /api/v1/functions/info`): the base plus the runtimes. */
 export interface FunctionInfo extends BasePlatformInfo {
-  runtimes: string[];
+  runtimes: RuntimeCapability[];
 }
 
 /**
@@ -169,7 +224,7 @@ export interface FunctionInfo extends BasePlatformInfo {
  * `port` only for containers, so each is optional here.
  */
 export interface PlatformInfo extends BasePlatformInfo {
-  runtimes?: string[];
+  runtimes?: RuntimeCapability[];
   port?: PortCapability;
 }
 
@@ -205,8 +260,12 @@ export interface FunctionCreateInput {
   name: string;
   gitRepo: string;
   branch: string;
+  // Sub-directory inside the repo to build from; "" (or omitted) is the root.
+  path?: string;
   gitToken: string;
   runtime: string;
+  // One of the runtime's advertised `versions`; null/omitted takes the default.
+  version?: string | null;
   env: EnvVarInput[];
   files: FileInput[];
   scaling: ScalingInput;
@@ -222,8 +281,13 @@ export interface FunctionUpdateInput {
   // stored one, a value rotates it.
   gitRepo: string;
   branch: string;
+  // Sub-directory inside the repo to build from; "" (or omitted) is the root.
+  path?: string;
   gitToken?: string | null;
   runtime: string;
+  // Replaced like every non-secret field (not keep-on-omit): null/omitted returns
+  // the function to the runtime default and rebuilds.
+  version?: string | null;
   env: EnvVarInput[];
   files: FileInput[];
   scaling: ScalingInput;

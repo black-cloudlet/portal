@@ -2,7 +2,13 @@
 export function statusTone(status: string): "ok" | "error" | "warn" | "muted" {
   if (status === "Ready") return "ok";
   if (status === "Failed" || status === "Degraded") return "error";
-  if (status === "Deploying" || status === "Pending" || status === "Terminating") return "warn";
+  if (
+    status === "Building" ||
+    status === "Deploying" ||
+    status === "Pending" ||
+    status === "Terminating"
+  )
+    return "warn";
   return "muted";
 }
 
