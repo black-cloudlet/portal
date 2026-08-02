@@ -104,8 +104,16 @@ export default function WorkloadForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [gitRepo, setGitRepo] = useState(initial?.gitRepo ?? "");
   const [branch, setBranch] = useState(initial?.branch ?? "main");
+  const [path, setPath] = useState(initial?.path ?? "");
   const [gitToken, setGitToken] = useState("");
-  const [runtime, setRuntime] = useState(initial?.runtime ?? info.runtimes?.[0] ?? "");
+  // Runtimes are objects ({name, versions, defaultVersion}); the picker deals in
+  // names, and the version list follows the selected runtime.
+  const runtimeList = info.runtimes ?? [];
+  const [runtime, setRuntime] = useState(initial?.runtime ?? runtimeList[0]?.name ?? "");
+  // "" means "take the runtime's default version" (sent as null).
+  const [version, setVersion] = useState(initial?.version ?? "");
+  const selectedRuntime = runtimeList.find((r) => r.name === runtime);
+  const versions = selectedRuntime?.versions ?? [];
   const [image, setImage] = useState(initial?.image ?? "");
   // Internal port the container listens on. PUT is now a full replace that
   // requires a port, so default a container with no explicit port (create, or an
@@ -197,6 +205,18 @@ export default function WorkloadForm({
       return { tab: "general", message: "Name is required." };
     if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
       return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
+    // The API's real limit is on name and group *together* (their join becomes the
+    // object name), published via /info so we can catch it before submitting.
+    if (mode === "create" && info.naming && name.trim() !== "") {
+      const composed = info.naming.template
+        .replace("{name}", name.trim())
+        .replace("{group}", group);
+      if (composed.length > info.naming.maxLength)
+        return {
+          tab: "general",
+          message: `Name too long: "${composed}" is ${composed.length} characters (max ${info.naming.maxLength}).`,
+        };
+    }
     if (isFn) {
       // PUT is a full replace, so the build inputs are required on edit as well
       // as create. The git token is redacted keep-on-omit (stored server-side),
@@ -268,8 +288,10 @@ export default function WorkloadForm({
             name,
             gitRepo,
             branch: branch || "main",
+            path: path.trim(),
             gitToken,
             runtime,
+            version: version.trim() === "" ? null : version,
             sites: null,
             ...common,
           };
@@ -294,7 +316,9 @@ export default function WorkloadForm({
           // defaults to main; the git token is sent only to rotate it.
           gitRepo,
           branch: branch.trim() || "main",
+          path: path.trim(),
           runtime,
+          version: version.trim() === "" ? null : version,
           gitToken: gitToken.trim() || null,
           ...common,
         };
@@ -427,16 +451,53 @@ export default function WorkloadForm({
                   onChange={(e) => setBranch(e.target.value)}
                 />
               </label>
+              <label className="field field--full">
+                <span className="field__label">Path</span>
+                <input
+                  className="input"
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  placeholder="repository root"
+                />
+                <span className="field__hint">
+                  Sub-directory in the repo to build from. Leave blank for the root.
+                </span>
+              </label>
               <label className="field">
                 <span className="field__label">Runtime</span>
                 <select
                   className="input"
                   value={runtime}
-                  onChange={(e) => setRuntime(e.target.value)}
+                  // Changing the runtime invalidates the chosen version; fall back
+                  // to that runtime's default (empty selection).
+                  onChange={(e) => {
+                    setRuntime(e.target.value);
+                    setVersion("");
+                  }}
                 >
-                  {(info.runtimes ?? []).map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                  {runtimeList.map((r) => (
+                    <option key={r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field__label">Version</span>
+                <select
+                  className="input"
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  disabled={versions.length === 0}
+                >
+                  <option value="">
+                    {selectedRuntime?.defaultVersion
+                      ? `Default (${selectedRuntime.defaultVersion})`
+                      : "Default"}
+                  </option>
+                  {versions.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
                     </option>
                   ))}
                 </select>

@@ -17,7 +17,7 @@ import {
 import { getServerlessContext } from "@/lib/serverless-context";
 
 /** Statuses that are still settling; while in one of these we auto-refresh. */
-const PENDING_STATUSES = new Set(["Pending", "Deploying", "Terminating"]);
+const PENDING_STATUSES = new Set(["Pending", "Building", "Deploying", "Terminating"]);
 const TAB_IDS: DetailTab[] = ["status", "variables", "secrets", "files", "advanced", "logs"];
 
 /**
@@ -166,6 +166,10 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                 <dd>{wl.runtime ?? "—"}</dd>
               </div>
               <div>
+                <dt>Version</dt>
+                <dd>{wl.version ?? "default"}</dd>
+              </div>
+              <div>
                 <dt>Git repo</dt>
                 <dd>{wl.gitRepo ?? "—"}</dd>
               </div>
@@ -173,6 +177,21 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                 <dt>Branch</dt>
                 <dd>{wl.branch ?? "—"}</dd>
               </div>
+              <div>
+                <dt>Path</dt>
+                <dd>{wl.path ? <code>{wl.path}</code> : "root"}</dd>
+              </div>
+              {wl.build && (
+                <div>
+                  <dt>Build</dt>
+                  <dd>
+                    <StatusPill status={wl.build.state} />
+                    {wl.build.message ? (
+                      <span className="text-error"> {wl.build.message}</span>
+                    ) : null}
+                  </dd>
+                </div>
+              )}
             </>
           ) : (
             <>
