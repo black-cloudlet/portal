@@ -192,8 +192,16 @@ code {
   max-width: 380px;
   text-align: center;
 }
+/* The brand mark, set in a tinted tile so it reads as a logo, not a stray icon. */
 .login__logo {
-  font-size: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  color: var(--primary);
+  background: var(--blue-50);
 }
 .login__title {
   margin: 12px 0 4px;
@@ -207,11 +215,6 @@ code {
 .login__button {
   width: 100%;
   padding: 12px;
-}
-.login__notice {
-  margin: 0 0 20px;
-  text-align: left;
-  font-size: 13px;
 }
 .login__hint {
   margin-top: 16px;
@@ -280,8 +283,16 @@ code {
 .topbar__brand:hover {
   text-decoration: none;
 }
+/* The same tinted tile as the sign-in mark, sized for the app bar. */
 .topbar__logo {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--primary);
+  background: var(--blue-50);
 }
 .topbar__product {
   font-size: 18px;
@@ -1281,6 +1292,70 @@ code {
   .form-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/*
+ * Port field: one bordered shell holding a plug glyph, the number, and (only
+ * once the value leaves the platform default) a chip that puts it back. The
+ * input inside is chrome-less so the shell reads as the control - it takes the
+ * focus ring on its behalf, and the number spinners are dropped because a port
+ * is typed, not stepped.
+ */
+.port-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.port-field:focus-within {
+  border-color: var(--blue-600);
+}
+.port-field__icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.port-field:focus-within .port-field__icon {
+  color: var(--blue-600);
+}
+.port-field__input {
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 8px 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.port-field__input:focus {
+  outline: none;
+}
+.port-field__input::-webkit-outer-spin-button,
+.port-field__input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.port-field__input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.port-field__reset {
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.port-field__reset:hover {
+  color: var(--blue-600);
+  border-color: var(--blue-600);
 }
 
 /* A titled block on the Variables & Secrets tab, with an action on the right. */

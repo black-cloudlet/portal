@@ -30,7 +30,7 @@ export default function TopBar({
       <div className="topbar__left">
         <Link href="/dashboard" className="topbar__brand">
           <span className="topbar__logo" aria-hidden="true">
-            <Icon name="cloud" size={22} />
+            <Icon name="cloud" size={18} />
           </span>
           <span className="topbar__product">
             {organization} <strong>{productName}</strong>
