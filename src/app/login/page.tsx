@@ -11,8 +11,9 @@ import { branding } from "@/lib/config";
  *
  * A session flagged for re-auth (its token could no longer be refreshed) still
  * exists but is unusable downstream, so we do NOT bounce it back to the console
- * - that would loop with the middleware. Instead we show the sign-in action and
- * a note so the user can mint a fresh token.
+ * - that would loop with the middleware. It simply lands on the sign-in action
+ * like any signed-out visitor: an expired token is routine, and calling it out
+ * reads as an error the user has to act on when signing in is all there is.
  */
 export default async function LoginPage({
   searchParams,
@@ -28,15 +29,10 @@ export default async function LoginPage({
     <main className="login">
       <div className="login__card">
         <div className="login__logo" aria-hidden="true">
-          <Icon name="cloud" size={44} />
+          <Icon name="cloud" size={34} />
         </div>
         <h1 className="login__title">{branding.productName}</h1>
         <p className="login__subtitle">{branding.organization} platform console</p>
-        {needsReauth && (
-          <p className="notice notice--warn login__notice" role="alert">
-            Your session has expired. Please sign in again to continue.
-          </p>
-        )}
         <form
           action={async () => {
             "use server";

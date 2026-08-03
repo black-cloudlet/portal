@@ -115,12 +115,13 @@ export default function WorkloadForm({
   const selectedRuntime = runtimeList.find((r) => r.name === runtime);
   const versions = selectedRuntime?.versions ?? [];
   const [image, setImage] = useState(initial?.image ?? "");
-  // Internal port the container listens on. PUT is now a full replace that
-  // requires a port, so default a container with no explicit port (create, or an
-  // older container that ran on Knative's default) to 8080.
-  const [port, setPort] = useState(
-    initial?.port != null ? String(initial.port) : !isFn ? "8080" : "",
-  );
+  // Port the workload listens on - published by /info for both offerings, so the
+  // bounds and the pre-filled default come from the API rather than this file.
+  // (The fallbacks only apply to an API that predates the port capability.)
+  const portRules = info.port ?? { required: false, default: 8080, min: 1, max: 65535 };
+  // PUT is a full replace, so a workload with no explicit port (create, or one
+  // created before the field existed) starts from the platform default.
+  const [port, setPort] = useState(String(initial?.port ?? portRules.default));
   const [registryUsername, setRegistryUsername] = useState(initial?.registryUsername ?? "");
   const [registryToken, setRegistryToken] = useState("");
 
@@ -226,11 +227,8 @@ export default function WorkloadForm({
       if (mode === "create" && gitToken.trim() === "")
         return { tab: "general", message: "Git token is required." };
     } else {
-      // Full replace: image and port are required on edit as well as create.
+      // Full replace: the image is required on edit as well as create.
       if (image.trim() === "") return { tab: "general", message: "Image is required." };
-      const portNum = Number(port);
-      if (port.trim() === "" || !Number.isInteger(portNum) || portNum < 1 || portNum > 65535)
-        return { tab: "general", message: "A valid internal port (1–65535) is required." };
       const hasUser = registryUsername.trim() !== "";
       const hasToken = registryToken.trim() !== "";
       // A token always needs a username; on create the two are all-or-nothing
@@ -243,6 +241,19 @@ export default function WorkloadForm({
           message: "Provide a registry token with the username, or leave both blank.",
         };
     }
+    // Both offerings carry a port, and the console always sends one, so it is
+    // checked once here against the bounds /info publishes.
+    const portNum = Number(port);
+    if (
+      port.trim() === "" ||
+      !Number.isInteger(portNum) ||
+      portNum < portRules.min ||
+      portNum > portRules.max
+    )
+      return {
+        tab: "general",
+        message: `A valid port (${portRules.min}–${portRules.max}) is required.`,
+      };
     for (const s of secrets) {
       if (s.name.trim() !== "" && s.value.trim() === "" && !(isEdit && s.existing))
         return { tab: "env", message: `Secret "${s.name}" needs a value.` };
@@ -270,12 +281,15 @@ export default function WorkloadForm({
       return;
     }
 
+    // Shared by all four bodies: a function and a container take the same
+    // non-source fields, port included.
     const common = {
       env: buildEnvList(variables, secrets, isEdit),
       files: buildFileList(files, isEdit),
       scaling: buildScaling(),
       size,
       hostname: hostname.trim() === "" ? null : hostname.trim(),
+      port: Number(port),
     };
 
     startTransition(async () => {
@@ -300,7 +314,6 @@ export default function WorkloadForm({
           const spec: ContainerCreateInput = {
             name,
             image,
-            port: Number(port),
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
             sites: null,
@@ -325,10 +338,9 @@ export default function WorkloadForm({
         res = await updateWorkloadAction("function", initial!.name, spec);
       } else {
         const spec: ContainerUpdateInput = {
-          // Full replace: image and port are the complete desired state.
+          // Full replace: the image is the complete desired state.
           // Registry: username+token rotates, username-only keeps, neither removes.
           image: image.trim(),
-          port: Number(port),
           registryUsername: registryUsername.trim() || null,
           registryToken: registryToken.trim() || null,
           ...common,
@@ -526,18 +538,6 @@ export default function WorkloadForm({
                 />
               </label>
               <label className="field">
-                <span className="field__label">Internal Port Number*</span>
-                <input
-                  className="input"
-                  type="number"
-                  min={1}
-                  max={65535}
-                  value={port}
-                  onChange={(e) => setPort(e.target.value)}
-                  placeholder="8080"
-                />
-              </label>
-              <label className="field">
                 <span className="field__label">Registry username</span>
                 <input
                   className="input"
@@ -569,6 +569,40 @@ export default function WorkloadForm({
               </div>
             </>
           )}
+
+          {/* Port: the same field for both offerings, since both take one. */}
+          <label className="field">
+            <span className="field__label">Port</span>
+            <div className="port-field">
+              <span className="port-field__icon" aria-hidden="true">
+                <Icon name="plug" size={15} />
+              </span>
+              <input
+                className="input port-field__input"
+                type="number"
+                inputMode="numeric"
+                min={portRules.min}
+                max={portRules.max}
+                value={port}
+                onChange={(e) => setPort(e.target.value)}
+                placeholder={String(portRules.default)}
+              />
+              {port.trim() !== String(portRules.default) && (
+                <button
+                  type="button"
+                  className="port-field__reset"
+                  onClick={() => setPort(String(portRules.default))}
+                  title={`Reset to the platform default (${portRules.default})`}
+                >
+                  Use {portRules.default}
+                </button>
+              )}
+            </div>
+            <span className="field__hint">
+              The port your {typeLabel.toLowerCase()} listens on ({portRules.min}–{portRules.max}).
+              Keep {portRules.default} unless the {isFn ? "app" : "image"} serves on another one.
+            </span>
+          </label>
 
           <label className="field">
             <span className="field__label">Size</span>

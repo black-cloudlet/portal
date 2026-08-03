@@ -97,7 +97,8 @@ export interface WorkloadDetail {
   // Container source.
   image?: string | null;
   registryUsername?: string | null;
-  // The port the container listens on (containers only).
+  // The port the workload listens on. Null when it was created without an
+  // explicit port and runs on the platform default (see /info's `port.default`).
   port?: number | null;
 }
 
@@ -152,9 +153,16 @@ export interface ScalingCapabilities {
   scaleDownDelay: ScaleDownDelayCapability;
 }
 
-/** The container `port` field's rules (from `GET .../containers/info`). */
+/**
+ * The `port` field's rules, published identically by both offerings' info
+ * documents (`GET .../functions/info` and `GET .../containers/info`).
+ *
+ * `default` is what the API applies when a body carries no port, so the form
+ * pre-fills from it rather than hardcoding the number.
+ */
 export interface PortCapability {
   required: boolean;
+  default: number;
   min: number;
   max: number;
 }
@@ -213,15 +221,20 @@ export interface ContainerInfo extends BasePlatformInfo {
   port: PortCapability;
 }
 
-/** Function capabilities (`GET /api/v1/functions/info`): the base plus the runtimes. */
+/**
+ * Function capabilities (`GET /api/v1/functions/info`): the base plus the
+ * runtimes and the same port rules a container publishes.
+ */
 export interface FunctionInfo extends BasePlatformInfo {
   runtimes: RuntimeCapability[];
+  port: PortCapability;
 }
 
 /**
  * The capabilities the shared create/edit form consumes. Both per-offering
- * documents are assignable to it: `runtimes` is returned only for functions and
- * `port` only for containers, so each is optional here.
+ * documents are assignable to it: `runtimes` is returned only for functions, and
+ * `port` is optional only because an API predating it would omit it (the form
+ * falls back to its own default then).
  */
 export interface PlatformInfo extends BasePlatformInfo {
   runtimes?: RuntimeCapability[];
@@ -266,6 +279,9 @@ export interface FunctionCreateInput {
   runtime: string;
   // One of the runtime's advertised `versions`; null/omitted takes the default.
   version?: string | null;
+  // The port the built app listens on. Optional to the API (it applies its own
+  // default), but the console always sends an explicit value, as for a container.
+  port: number;
   env: EnvVarInput[];
   files: FileInput[];
   scaling: ScalingInput;
@@ -288,6 +304,9 @@ export interface FunctionUpdateInput {
   // Replaced like every non-secret field (not keep-on-omit): null/omitted returns
   // the function to the runtime default and rebuilds.
   version?: string | null;
+  // Replaced too, and always sent: omitting it would return the function to the
+  // platform default port rather than keeping the deployed one.
+  port: number;
   env: EnvVarInput[];
   files: FileInput[];
   scaling: ScalingInput;

@@ -10,7 +10,10 @@ import type { ReactNode } from "react";
  * names fall back to a generic box so a new offering never renders blank.
  */
 const ICONS: Record<string, ReactNode> = {
-  cloud: <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />,
+  // Brand mark. Drawn as one silhouette (a 7-unit body with a 4.5-unit lobe on a
+  // shared baseline) rather than a circle overlapping a rounded box, so the
+  // outline stays even-weighted and centred at any size.
+  cloud: <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
   // Close / dismiss.
   x: (
@@ -40,6 +43,15 @@ const ICONS: Record<string, ReactNode> = {
     <>
       <path d="m16 18 6-6-6-6" />
       <path d="m8 6-6 6 6 6" />
+    </>
+  ),
+  // The port a workload listens on: a plug.
+  plug: (
+    <>
+      <path d="M9 2v6" />
+      <path d="M15 2v6" />
+      <path d="M6 8h12v4a6 6 0 0 1-12 0z" />
+      <path d="M12 18v4" />
     </>
   ),
   // Confirmation check (e.g. active item in a menu).

@@ -181,6 +181,10 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                 <dt>Path</dt>
                 <dd>{wl.path ? <code>{wl.path}</code> : "root"}</dd>
               </div>
+              <div>
+                <dt>Port</dt>
+                <dd>{wl.port ?? "default"}</dd>
+              </div>
               {wl.build && (
                 <div>
                   <dt>Build</dt>
@@ -201,7 +205,7 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
               </div>
               <div>
                 <dt>Port</dt>
-                <dd>{wl.port ?? "—"}</dd>
+                <dd>{wl.port ?? "default"}</dd>
               </div>
               <div>
                 <dt>Registry user</dt>
