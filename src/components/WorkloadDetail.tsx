@@ -11,7 +11,9 @@ import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
   getWorkloadLogs,
+  getWorkloadStats,
   typeSegment,
+  type ResourceUsage,
   type WorkloadDetail as WorkloadDetailData,
   type WorkloadType,
 } from "@/lib/serverless";
@@ -19,7 +21,15 @@ import { getServerlessContext } from "@/lib/serverless-context";
 
 /** Statuses that are still settling; while in one of these we auto-refresh. */
 const PENDING_STATUSES = new Set(["Pending", "Building", "Deploying", "Terminating"]);
-const TAB_IDS: DetailTab[] = ["status", "variables", "secrets", "files", "advanced", "logs"];
+const TAB_IDS: DetailTab[] = [
+  "status",
+  "metrics",
+  "variables",
+  "secrets",
+  "files",
+  "advanced",
+  "logs",
+];
 
 /**
  * Some log sources hand back their text with escaped newline sequences (a
@@ -42,8 +52,9 @@ function fmtDate(v: string | null | undefined): string {
 
 /**
  * The workload detail view: a header with status and Edit/Delete actions, a
- * metadata strip, and the Status / Variables / Secrets / Files / Advanced / Logs
- * tabs. Server-rendered per request; auto-refreshes while still deploying.
+ * metadata strip, and the Status / Metrics / Variables / Secrets / Files /
+ * Advanced / Logs tabs. Server-rendered per request; auto-refreshes while still
+ * deploying.
  */
 export default async function WorkloadDetail({
   type,
@@ -148,6 +159,9 @@ export default async function WorkloadDetail({
       <WorkloadDetailTabs active={activeTab} />
 
       {activeTab === "status" && <StatusPanel wl={wl} />}
+      {activeTab === "metrics" && (
+        <MetricsPanel type={type} group={activeGroup} name={name} accessToken={accessToken} />
+      )}
       {activeTab === "variables" && <VariablesPanel wl={wl} />}
       {activeTab === "secrets" && <SecretsPanel wl={wl} />}
       {activeTab === "files" && <FilesPanel wl={wl} />}
@@ -372,7 +386,7 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
   );
 }
 
-/** Desired autoscaling and current per-site replicas / live usage. */
+/** Desired autoscaling. Live replicas and usage are on the Metrics tab. */
 function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
   const sc = wl.scaling;
   return (
@@ -406,10 +420,77 @@ function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
           <div className="notice">No scaling configuration.</div>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Render a usage figure, or an em dash when nothing was measured. */
+function usageCell(u: ResourceUsage | null, key: "cpu" | "memory") {
+  return u?.[key] ?? "—";
+}
+
+/**
+ * Live resource usage, replica count and status, from the lightweight `/stats`
+ * endpoint rather than the full GET - so this tab does not re-read the
+ * workload's spec (and its backing Secret) on every refresh.
+ */
+async function MetricsPanel({
+  type,
+  group,
+  name,
+  accessToken,
+}: {
+  type: WorkloadType;
+  group: string;
+  name: string;
+  accessToken?: string;
+}) {
+  let stats;
+  try {
+    stats = await getWorkloadStats(type, group, name, accessToken);
+  } catch (err) {
+    return <ApiErrorNotice error={err} />;
+  }
+
+  // The API nulls a total when a site could not be measured, so say which it is
+  // rather than showing a dash that reads as "zero".
+  const unmeasured = stats.usage == null && stats.sites.some((s) => s.usage != null);
+
+  return (
+    <div className="stack">
+      <section>
+        <h3 className="section-title">Totals</h3>
+        <dl className="meta-grid">
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <StatusPill status={stats.overallStatus} />
+            </dd>
+          </div>
+          <div>
+            <dt>Replicas</dt>
+            <dd>{stats.replicas ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>CPU</dt>
+            <dd>{usageCell(stats.usage, "cpu")}</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd>{usageCell(stats.usage, "memory")}</dd>
+          </div>
+        </dl>
+        {unmeasured && (
+          <p className="text-muted">
+            A site could not be measured, so the totals are not shown - a figure missing a whole
+            site would understate the workload. The per-site rows below show what did report.
+          </p>
+        )}
+      </section>
 
       <section>
-        <h3 className="section-title">Live capacity</h3>
-        {wl.sites.length === 0 ? (
+        <h3 className="section-title">Per site</h3>
+        {stats.sites.length === 0 ? (
           <div className="notice">No running sites.</div>
         ) : (
           <div className="table-wrap">
@@ -417,24 +498,32 @@ function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
               <thead>
                 <tr>
                   <th>Site</th>
+                  <th>Status</th>
                   <th>Replicas</th>
                   <th>CPU</th>
                   <th>Memory</th>
                 </tr>
               </thead>
               <tbody>
-                {wl.sites.map((s) => (
+                {stats.sites.map((s) => (
                   <tr key={s.site}>
                     <td>{s.site}</td>
+                    <td>
+                      <StatusPill status={s.status} />
+                    </td>
                     <td>{s.replicas ?? "—"}</td>
-                    <td>{s.usage?.cpu ?? "—"}</td>
-                    <td>{s.usage?.memory ?? "—"}</td>
+                    <td>{usageCell(s.usage, "cpu")}</td>
+                    <td>{usageCell(s.usage, "memory")}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        <p className="text-muted">
+          Usage covers each pod&apos;s own container, not the platform sidecar, and is blank while a
+          workload is scaled to zero. It is never fresher than the cluster&apos;s metrics scrape.
+        </p>
       </section>
     </div>
   );

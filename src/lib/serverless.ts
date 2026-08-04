@@ -41,7 +41,29 @@ export interface SiteStatus {
   revision: string | null;
   error: string | null;
   replicas: number | null;
+}
+
+/** One site's live numbers, from `GET .../{name}/stats`. */
+export interface SiteStats {
+  site: string;
+  status: string;
+  replicas: number | null;
   usage: ResourceUsage | null;
+}
+
+/**
+ * A workload's live state (`GET .../{name}/stats`) - the lightweight endpoint.
+ *
+ * The totals are summed across sites before rounding, so they need not equal
+ * the sum of the per-site figures; render them rather than re-adding the parts.
+ * Either is null when a site could not be measured, rather than a figure
+ * quietly missing that site.
+ */
+export interface WorkloadStats {
+  overallStatus: string;
+  replicas: number | null;
+  usage: ResourceUsage | null;
+  sites: SiteStats[];
 }
 
 /** An env var read back from a workload; secret values are redacted to null. */
@@ -531,6 +553,19 @@ export function getWorkload(
 ): Promise<WorkloadDetail> {
   return apiGet<WorkloadDetail>(
     `${collectionPath(type, group)}/${encodeURIComponent(name)}`,
+    accessToken,
+  );
+}
+
+/** A workload's live usage, replicas and status (`GET .../{type}s/{name}/stats`). */
+export function getWorkloadStats(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<WorkloadStats> {
+  return apiGet<WorkloadStats>(
+    `${collectionPath(type, group)}/${encodeURIComponent(name)}/stats`,
     accessToken,
   );
 }
