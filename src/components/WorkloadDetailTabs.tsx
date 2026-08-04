@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 const TABS = [
   { id: "status", label: "Status" },
+  { id: "metrics", label: "Metrics" },
   { id: "variables", label: "Variables" },
   { id: "secrets", label: "Secrets" },
   { id: "files", label: "Files" },
