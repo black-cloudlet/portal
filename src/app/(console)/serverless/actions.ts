@@ -67,7 +67,14 @@ export async function createWorkloadAction(
     return toActionError(err);
   }
   revalidatePath(`/serverless/${typeSegment(type)}`);
-  redirect(`/serverless/${typeSegment(type)}/${encodeURIComponent(spec.name)}`);
+  // A create is accepted (202) and applied in the background, so the detail page
+  // can be rendered before the workload exists and answer NOT_FOUND - a race, not
+  // a failure. `created` stamps when the API accepted it, so the detail view can
+  // wait that out rather than showing the user a red error for their own brand
+  // new workload (see WorkloadDetail's create grace window).
+  redirect(
+    `/serverless/${typeSegment(type)}/${encodeURIComponent(spec.name)}?created=${Date.now()}`,
+  );
 }
 
 export async function updateWorkloadAction(

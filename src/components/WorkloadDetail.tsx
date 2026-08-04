@@ -7,6 +7,7 @@ import Icon from "@/components/Icon";
 import LogsToolbar from "@/components/LogsToolbar";
 import StatusPill from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
+import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
   getWorkloadLogs,
@@ -49,11 +50,14 @@ export default async function WorkloadDetail({
   name,
   tab,
   container,
+  created,
 }: {
   type: WorkloadType;
   name: string;
   tab?: string;
   container?: string;
+  /** Epoch ms the create was accepted, carried by the post-create redirect. */
+  created?: string;
 }) {
   const { enabled, activeGroup, accessToken } = await getServerlessContext();
   const seg = typeSegment(type);
@@ -69,6 +73,11 @@ export default async function WorkloadDetail({
   try {
     wl = await getWorkload(type, activeGroup, name, accessToken);
   } catch (err) {
+    // A just-accepted workload the platform hasn't created yet is a race, not a
+    // failure - so wait it out and poll instead of showing the user a red error
+    // for the workload they just created. Anything else (and anything past the
+    // window) is the API's own error, shown as such.
+    const provisioning = isNotFound(err) && withinCreateGrace(created);
     return (
       <div className="detail">
         <div className="detail__bar">
@@ -77,7 +86,11 @@ export default async function WorkloadDetail({
             Back to {seg}
           </Link>
         </div>
-        <ApiErrorNotice error={err} />
+        {provisioning ? (
+          <ProvisioningPanel type={type} name={name} />
+        ) : (
+          <ApiErrorNotice error={err} />
+        )}
       </div>
     );
   }
@@ -149,6 +162,31 @@ export default async function WorkloadDetail({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Stand-in for a workload the API has accepted but not created yet, shown in
+ * place of the NOT_FOUND error inside the create grace window. Polls faster than
+ * the settled view: what it's waiting for lands within seconds, and the moment it
+ * does this whole branch is gone and the real detail view renders.
+ */
+function ProvisioningPanel({ type, name }: { type: WorkloadType; name: string }) {
+  return (
+    <>
+      <AutoRefresh intervalMs={3000} />
+      <div className="detail__head">
+        <div>
+          <h2 className="detail__title">
+            {name} <StatusPill status="Pending" />
+          </h2>
+        </div>
+      </div>
+      <div className="notice">
+        This {type} was accepted and is being created. This page refreshes on its own and shows it
+        as soon as the platform has it.
+      </div>
+    </>
   );
 }
 
