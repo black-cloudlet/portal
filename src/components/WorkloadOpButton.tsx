@@ -3,10 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import {
-  pullContainerAction,
-  rebuildFunctionAction,
-} from "@/app/(console)/serverless/actions";
+import { pullContainerAction, rebuildFunctionAction } from "@/app/(console)/serverless/actions";
 import type { WorkloadType } from "@/lib/serverless";
 
 /**

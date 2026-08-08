@@ -143,7 +143,13 @@ describe("mintStreamTicket", () => {
 
 describe("pods and pod-log snapshots", () => {
   it("asks the pods endpoint for the one-shot JSON roster", async () => {
-    const calls = stubFetch({ name: "orders", group: "team", type: "function", site: "c", pods: [] });
+    const calls = stubFetch({
+      name: "orders",
+      group: "team",
+      type: "function",
+      site: "c",
+      pods: [],
+    });
 
     await getPodsSnapshot("function", "team", "orders", "tok");
 

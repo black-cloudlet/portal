@@ -150,9 +150,7 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
         },
         warning: (data) => {
           const w = data as { message: string; droppedLines?: number | null };
-          setNotice(
-            w.droppedLines ? `${w.message} (${w.droppedLines} lines dropped)` : w.message,
-          );
+          setNotice(w.droppedLines ? `${w.message} (${w.droppedLines} lines dropped)` : w.message);
         },
         end: (data) => {
           // An `end` is routine, never a failure - but it means two different
@@ -200,9 +198,7 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
       if ("snapshot" in res) {
         setLogError(null);
         setLines(
-          res.snapshot.lines
-            .slice(-MAX_LINES)
-            .map((line) => ({ id: nextLineId.current++, line })),
+          res.snapshot.lines.slice(-MAX_LINES).map((line) => ({ id: nextLineId.current++, line })),
         );
       } else {
         setLogError(res.error);
