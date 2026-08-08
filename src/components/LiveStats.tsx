@@ -31,6 +31,7 @@ export default function LiveStats({
 }) {
   const [stats, setStats] = useState<WorkloadStats>(initial);
   const [mode, setMode] = useState<"connecting" | "live" | "polling">("connecting");
+  const [pollError, setPollError] = useState<string | null>(null);
 
   useEffect(() => {
     const stream = openTicketedStream({
@@ -59,7 +60,14 @@ export default function LiveStats({
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
       const res = await getStatsAction(type, name);
-      if (!stop && "stats" in res) setStats(res.stats);
+      if (stop) return;
+      if ("stats" in res) {
+        setPollError(null);
+        setStats(res.stats);
+      } else {
+        // Say the refresh failed rather than quietly showing stale figures.
+        setPollError(res.error);
+      }
     };
     void tick();
     const id = setInterval(tick, 5000);
@@ -75,6 +83,11 @@ export default function LiveStats({
 
   return (
     <div className="stack">
+      {pollError && (
+        <div className="notice notice--error">
+          The figures below may be stale - the last refresh failed: {pollError}
+        </div>
+      )}
       <section>
         <div className="section-row">
           <h3 className="section-title">Totals</h3>
