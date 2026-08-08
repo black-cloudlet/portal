@@ -1444,10 +1444,83 @@ code {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .logs-toolbar .input {
   width: auto;
   flex: 0 1 240px;
+}
+/* The pod picker gets the room: pod names are long and the interesting bit is the suffix. */
+.logs-toolbar__pod {
+  flex: 1 1 320px;
+  min-width: 220px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Live-stream state indicator on the Metrics and Logs tabs. */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.live-dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.live-dot--live {
+  color: var(--green-600);
+}
+.live-dot--live::before {
+  background: var(--green-600);
+}
+.live-dot--polling::before {
+  background: var(--yellow-700);
+}
+
+/* Section heading with a status/indicator on the same row. */
+.section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-row .section-title {
+  margin-bottom: 0;
+}
+
+/* One followed log line: a muted time gutter, then the message as logged. */
+.log-line__time {
+  color: var(--text-muted);
+}
+
+/* Build/Pull maintenance action next to Edit/Delete on the detail header. */
+.op-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.op-action__error {
+  color: var(--red-600);
+  font-size: 12px;
+  max-width: 320px;
+}
+
+/* Confirmation dialogs are narrower than the create form's modal. */
+.modal--confirm {
+  max-width: 440px;
+}
+.confirm__text {
+  margin-bottom: 16px;
+}
+.confirm__text p {
+  margin: 0;
 }
 
 /* ---------- Redesign: richer nav, view header, list toolbar, cards ---------- */

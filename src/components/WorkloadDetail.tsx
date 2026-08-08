@@ -4,16 +4,16 @@ import ApiErrorNotice from "@/components/ApiErrorNotice";
 import AutoRefresh from "@/components/AutoRefresh";
 import DeleteWorkloadButton from "@/components/DeleteWorkloadButton";
 import Icon from "@/components/Icon";
-import LogsToolbar from "@/components/LogsToolbar";
+import LiveStats from "@/components/LiveStats";
+import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
+import WorkloadOpButton from "@/components/WorkloadOpButton";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
-  getWorkloadLogs,
   getWorkloadStats,
   typeSegment,
-  type ResourceUsage,
   type WorkloadDetail as WorkloadDetailData,
   type WorkloadType,
 } from "@/lib/serverless";
@@ -30,16 +30,6 @@ const TAB_IDS: DetailTab[] = [
   "advanced",
   "logs",
 ];
-
-/**
- * Some log sources hand back their text with escaped newline sequences (a
- * literal "\n" rather than a real line break), which collapses the whole log
- * onto one line. Turn escaped CR/LF sequences — and any real CRLF — into plain
- * "\n" so the <pre> lays the log out one entry per line.
- */
-function normalizeLogText(s: string): string {
-  return s.replace(/\r\n?/g, "\n").replace(/\\r\\n|\\n|\\r/g, "\n");
-}
 
 /** Show the API's naive local timestamp as-is (no timezone math). */
 function fmtDate(v: string | null | undefined): string {
@@ -60,13 +50,11 @@ export default async function WorkloadDetail({
   type,
   name,
   tab,
-  container,
   created,
 }: {
   type: WorkloadType;
   name: string;
   tab?: string;
-  container?: string;
   /** Epoch ms the create was accepted, carried by the post-create redirect. */
   created?: string;
 }) {
@@ -130,6 +118,7 @@ export default async function WorkloadDetail({
           </p>
         </div>
         <div className="detail__actions">
+          <WorkloadOpButton type={type} name={wl.name} />
           <Link className="btn" href={`/serverless/${seg}/${encodeURIComponent(wl.name)}/edit`}>
             Edit
           </Link>
@@ -166,15 +155,7 @@ export default async function WorkloadDetail({
       {activeTab === "secrets" && <SecretsPanel wl={wl} />}
       {activeTab === "files" && <FilesPanel wl={wl} />}
       {activeTab === "advanced" && <AdvancedPanel wl={wl} />}
-      {activeTab === "logs" && (
-        <LogsPanel
-          type={type}
-          group={activeGroup}
-          name={name}
-          accessToken={accessToken}
-          container={container}
-        />
-      )}
+      {activeTab === "logs" && <PodLogsViewer type={type} name={name} />}
     </div>
   );
 }
@@ -424,15 +405,10 @@ function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
   );
 }
 
-/** Render a usage figure, or an em dash when nothing was measured. */
-function usageCell(u: ResourceUsage | null, key: "cpu" | "memory") {
-  return u?.[key] ?? "—";
-}
-
 /**
- * Live resource usage, replica count and status, from the lightweight `/stats`
- * endpoint rather than the full GET - so this tab does not re-read the
- * workload's spec (and its backing Secret) on every refresh.
+ * The Metrics tab. The first read happens here on the server (so the tab paints
+ * with data), then LiveStats follows the `/stats/stream` SSE endpoint in the
+ * browser - falling back to polling the `/stats` snapshot when it cannot.
  */
 async function MetricsPanel({
   type,
@@ -451,134 +427,5 @@ async function MetricsPanel({
   } catch (err) {
     return <ApiErrorNotice error={err} />;
   }
-
-  // The API nulls a total when a site could not be measured, so say which it is
-  // rather than showing a dash that reads as "zero".
-  const unmeasured = stats.usage == null && stats.sites.some((s) => s.usage != null);
-
-  return (
-    <div className="stack">
-      <section>
-        <h3 className="section-title">Totals</h3>
-        <dl className="meta-grid">
-          <div>
-            <dt>Status</dt>
-            <dd>
-              <StatusPill status={stats.overallStatus} />
-            </dd>
-          </div>
-          <div>
-            <dt>Replicas</dt>
-            <dd>{stats.replicas ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>CPU</dt>
-            <dd>{usageCell(stats.usage, "cpu")}</dd>
-          </div>
-          <div>
-            <dt>Memory</dt>
-            <dd>{usageCell(stats.usage, "memory")}</dd>
-          </div>
-        </dl>
-        {unmeasured && (
-          <p className="text-muted">
-            A site could not be measured, so the totals are not shown - a figure missing a whole
-            site would understate the workload. The per-site rows below show what did report.
-          </p>
-        )}
-      </section>
-
-      <section>
-        <h3 className="section-title">Per site</h3>
-        {stats.sites.length === 0 ? (
-          <div className="notice">No running sites.</div>
-        ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Site</th>
-                  <th>Status</th>
-                  <th>Replicas</th>
-                  <th>CPU</th>
-                  <th>Memory</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.sites.map((s) => (
-                  <tr key={s.site}>
-                    <td>{s.site}</td>
-                    <td>
-                      <StatusPill status={s.status} />
-                    </td>
-                    <td>{s.replicas ?? "—"}</td>
-                    <td>{usageCell(s.usage, "cpu")}</td>
-                    <td>{usageCell(s.usage, "memory")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="text-muted">
-          Usage covers each pod&apos;s own container, not the platform sidecar, and is blank while a
-          workload is scaled to zero. It is never fresher than the cluster&apos;s metrics scrape.
-        </p>
-      </section>
-    </div>
-  );
-}
-
-/** Pod log snapshots from the local site. */
-async function LogsPanel({
-  type,
-  group,
-  name,
-  accessToken,
-  container,
-}: {
-  type: WorkloadType;
-  group: string;
-  name: string;
-  accessToken?: string;
-  container?: string;
-}) {
-  let logs;
-  try {
-    logs = await getWorkloadLogs(type, group, name, accessToken, { container });
-  } catch (err) {
-    return (
-      <div className="stack">
-        <LogsToolbar container={container ?? "user-container"} />
-        <ApiErrorNotice error={err} />
-      </div>
-    );
-  }
-  return (
-    <div className="stack">
-      <LogsToolbar container={container ?? "user-container"} />
-      <p className="text-muted">
-        Point-in-time snapshot from site <strong>{logs.site}</strong>. A scaled-to-zero workload has
-        no pods.
-      </p>
-      {logs.pods.length === 0 ? (
-        <div className="notice">No running pods to read logs from.</div>
-      ) : (
-        logs.pods.map((p) => (
-          <div key={p.pod} className="file-card">
-            <div className="file-card__head">
-              <code>{p.pod}</code>
-              <span className="file-card__tags">
-                <span className="pill pill--muted">{p.container}</span>
-                {p.revision && <span className="pill pill--muted">{p.revision}</span>}
-              </span>
-            </div>
-            <pre className="code-block code-block--logs">
-              {p.logs ? normalizeLogText(p.logs) : "(empty)"}
-            </pre>
-          </div>
-        ))
-      )}
-    </div>
-  );
+  return <LiveStats type={type} name={name} initial={stats} />;
 }

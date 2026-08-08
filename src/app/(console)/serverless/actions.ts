@@ -14,15 +14,26 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  buildFunction,
   createWorkload,
   deleteWorkload,
+  getPodLogsSnapshot,
+  getPodsSnapshot,
+  getWorkloadStats,
+  mintStreamTicket,
+  pullContainer,
   ServerlessApiError,
+  streamBaseUrl,
   typeSegment,
   updateWorkload,
+  workloadStreamPath,
   type ContainerCreateInput,
   type ContainerUpdateInput,
   type FunctionCreateInput,
   type FunctionUpdateInput,
+  type PodLogSnapshot,
+  type PodRoster,
+  type WorkloadStats,
   type WorkloadType,
 } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
@@ -94,6 +105,132 @@ export async function updateWorkloadAction(
   revalidatePath(`/serverless/${seg}/${name}`);
   revalidatePath(`/serverless/${seg}`);
   redirect(`/serverless/${seg}/${encodeURIComponent(name)}`);
+}
+
+/**
+ * Build the function's current source again (POST .../build, no body). The API
+ * answers 202 and the build runs in the background; the caller refreshes the
+ * detail view, which reports `Building` while it runs.
+ */
+export async function rebuildFunctionAction(name: string): Promise<ActionError | void> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  try {
+    await buildFunction(ctx.group, name, ctx.accessToken);
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/serverless/functions/${name}`);
+}
+
+/**
+ * Pull the container's image tag again (POST .../pull, no body). 202 - one new
+ * revision per site re-resolves the tag; a digest-pinned image returns the
+ * API's own 400, surfaced inline.
+ */
+export async function pullContainerAction(name: string): Promise<ActionError | void> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  try {
+    await pullContainer(ctx.group, name, ctx.accessToken);
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/serverless/containers/${name}`);
+}
+
+/** What a client stream component asks to follow. */
+export type StreamSpec =
+  | { kind: "pods" }
+  | { kind: "stats" }
+  | { kind: "logs"; pod: string; container?: string; sinceSeconds?: number };
+
+/**
+ * Mint a stream ticket for one of this workload's SSE endpoints and hand the
+ * browser the full URL to open (`EventSource` cannot send an Authorization
+ * header, so the token is spent here - server-side - for a short-lived,
+ * single-path ticket; see the Serverless API's streaming docs).
+ *
+ * The group comes from the session, never from the client; the API re-runs the
+ * same group authorization when the stream opens. A 503 means the deployment
+ * mints no tickets, and the caller falls back to snapshot polling.
+ */
+export async function mintStreamUrlAction(
+  type: WorkloadType,
+  name: string,
+  stream: StreamSpec,
+): Promise<{ url: string } | ActionError> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  const path = workloadStreamPath(
+    type,
+    ctx.group,
+    name,
+    stream.kind === "logs" ? { kind: "logs", pod: stream.pod } : { kind: stream.kind },
+  );
+  try {
+    const { ticket } = await mintStreamTicket(path, ctx.accessToken);
+    const q = new URLSearchParams({ ticket });
+    if (stream.kind === "logs") {
+      if (stream.container) q.set("container", stream.container);
+      if (stream.sinceSeconds) q.set("sinceSeconds", String(stream.sinceSeconds));
+    }
+    return { url: `${streamBaseUrl()}${path}?${q}` };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/** Poll fallback for the Metrics tab when the stats stream cannot be opened. */
+export async function getStatsAction(
+  type: WorkloadType,
+  name: string,
+): Promise<{ stats: WorkloadStats } | ActionError> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  try {
+    return { stats: await getWorkloadStats(type, ctx.group, name, ctx.accessToken) };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/** Poll fallback for the pod roster when the pods stream cannot be opened. */
+export async function getPodsAction(
+  type: WorkloadType,
+  name: string,
+): Promise<{ roster: PodRoster } | ActionError> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  try {
+    return { roster: await getPodsSnapshot(type, ctx.group, name, ctx.accessToken) };
+  } catch (err) {
+    return toActionError(err);
+  }
+}
+
+/** Snapshot fallback for one pod's log when its stream cannot be opened. */
+export async function getPodLogsAction(
+  type: WorkloadType,
+  name: string,
+  pod: string,
+  opts: { container?: string; sinceSeconds?: number; limitBytes?: number } = {},
+): Promise<{ snapshot: PodLogSnapshot } | ActionError> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  try {
+    return {
+      snapshot: await getPodLogsSnapshot(type, ctx.group, name, pod, ctx.accessToken, opts),
+    };
+  } catch (err) {
+    return toActionError(err);
+  }
 }
 
 export async function deleteWorkloadAction(

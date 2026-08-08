@@ -132,19 +132,67 @@ export interface BuildStatusView {
   message: string | null;
 }
 
-export interface PodLogs {
+/**
+ * One of the workload's pods on the local site, from the `/pods` roster.
+ * `usage` is per pod and null for a pod too new to have been scraped.
+ */
+export interface PodInfo {
   pod: string;
-  container: string;
   revision: string | null;
-  logs: string;
+  phase: string;
+  ready: boolean;
+  restarts: number;
+  startedAt: string | null;
+  usage: ResourceUsage | null;
 }
 
-export interface LogsResponse {
+/**
+ * The `pods` event / `?follow=false` snapshot of `GET .../{name}/pods`: which
+ * pods the workload has on the local site right now. Empty is a normal state
+ * (scaled to zero), not an error.
+ */
+export interface PodRoster {
   name: string;
   group: string;
   type: WorkloadType;
   site: string;
-  pods: PodLogs[];
+  pods: PodInfo[];
+}
+
+/** One line of a pod log - the `log` event, and what a snapshot's `lines` holds. */
+export interface LogLine {
+  pod: string;
+  container: string;
+  revision: string | null;
+  time: string | null;
+  message: string;
+}
+
+/**
+ * One pod's log as the node holds it right now
+ * (`GET .../logs/pods/{pod}?follow=false`) - the same lines a follow would
+ * have delivered, bounded by the node's log rotation.
+ */
+export interface PodLogSnapshot {
+  name: string;
+  group: string;
+  type: WorkloadType;
+  site: string;
+  pod: string;
+  container: string;
+  revision: string | null;
+  lines: LogLine[];
+}
+
+/**
+ * A minted stream ticket (`POST /api/v1/stream-tickets`): the browser's
+ * credential for one SSE path, sent as `?ticket=` since EventSource cannot
+ * carry an Authorization header.
+ */
+export interface StreamTicket {
+  ticket: string;
+  expiresAt: string;
+  path: string;
 }
 
 /* ---------- /info capabilities (drive the create/edit form) ---------- */
@@ -570,21 +618,122 @@ export function getWorkloadStats(
   );
 }
 
-/** A workload's pod logs from the local site (`GET .../{type}s/{name}/logs`). */
-export function getWorkloadLogs(
+/**
+ * The path of one of a workload's streaming endpoints - what a ticket is minted
+ * for, and what the browser's EventSource opens (with `?ticket=` appended).
+ * Query parameters are deliberately excluded: the ticket signs the path alone.
+ */
+export function workloadStreamPath(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  stream: { kind: "pods" } | { kind: "stats" } | { kind: "logs"; pod: string },
+): string {
+  const base = `${collectionPath(type, group)}/${encodeURIComponent(name)}`;
+  switch (stream.kind) {
+    case "pods":
+      return `${base}/pods`;
+    case "stats":
+      return `${base}/stats/stream`;
+    case "logs":
+      return `${base}/logs/pods/${encodeURIComponent(stream.pod)}`;
+  }
+}
+
+/**
+ * Mint a short-lived ticket for one streaming path
+ * (`POST /api/v1/stream-tickets`). The user's token is spent server-side, on a
+ * request that can carry it; only the ticket - one path, ~60s - reaches the
+ * browser. A 503 means the deployment has no signing key, so streaming is off
+ * for browsers and the caller should fall back to snapshot polling.
+ */
+export function mintStreamTicket(
+  path: string,
+  accessToken: string | undefined,
+): Promise<StreamTicket> {
+  return apiSend<StreamTicket>("POST", "/api/v1/stream-tickets", accessToken, {
+    path,
+  }) as Promise<StreamTicket>;
+}
+
+/**
+ * The base URL the browser opens streams against - the same API address the
+ * server calls (an externally-routed host in every deployment; the API's
+ * `SERVERLESS_CORS_ALLOW_ORIGINS` must include the portal's origin).
+ */
+export function streamBaseUrl(): string {
+  return baseUrl();
+}
+
+/**
+ * One JSON roster of the workload's pods on the local site
+ * (`GET .../{name}/pods?follow=false`) - the non-streaming form, for polling.
+ */
+export function getPodsSnapshot(
   type: WorkloadType,
   group: string,
   name: string,
   accessToken: string | undefined,
+): Promise<PodRoster> {
+  return apiGet<PodRoster>(
+    `${workloadStreamPath(type, group, name, { kind: "pods" })}?follow=false`,
+    accessToken,
+  );
+}
+
+/**
+ * One pod's log as the node holds it right now
+ * (`GET .../{name}/logs/pods/{pod}?follow=false`) - the non-streaming form.
+ */
+export function getPodLogsSnapshot(
+  type: WorkloadType,
+  group: string,
+  name: string,
+  pod: string,
+  accessToken: string | undefined,
   opts: { container?: string; sinceSeconds?: number; limitBytes?: number } = {},
-): Promise<LogsResponse> {
-  const q = new URLSearchParams();
+): Promise<PodLogSnapshot> {
+  const q = new URLSearchParams({ follow: "false" });
   if (opts.container) q.set("container", opts.container);
   if (opts.sinceSeconds) q.set("sinceSeconds", String(opts.sinceSeconds));
   if (opts.limitBytes) q.set("limitBytes", String(opts.limitBytes));
-  const suffix = q.toString() ? `?${q}` : "";
-  return apiGet<LogsResponse>(
-    `${collectionPath(type, group)}/${encodeURIComponent(name)}/logs${suffix}`,
+  return apiGet<PodLogSnapshot>(
+    `${workloadStreamPath(type, group, name, { kind: "logs", pod })}?${q}`,
+    accessToken,
+  );
+}
+
+/**
+ * Build the function's current source again (`POST .../functions/{name}/build`,
+ * no body). 202 - the spec is untouched and the running revision keeps serving;
+ * the build lands via the platform's build controller. Poll the workload (its
+ * `build.state` / `overallStatus` report Building) to watch it.
+ */
+export function buildFunction(
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<WorkloadDetail | null> {
+  return apiSend<WorkloadDetail>(
+    "POST",
+    `${collectionPath("function", group)}/${encodeURIComponent(name)}/build`,
+    accessToken,
+  );
+}
+
+/**
+ * Pull the container's image tag again (`POST .../containers/{name}/pull`, no
+ * body). 202 - cuts one new revision in every site so the tag is resolved to a
+ * digest again. A digest-pinned image is a 400 (nothing newer to pull).
+ */
+export function pullContainer(
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<WorkloadDetail | null> {
+  return apiSend<WorkloadDetail>(
+    "POST",
+    `${collectionPath("container", group)}/${encodeURIComponent(name)}/pull`,
     accessToken,
   );
 }
