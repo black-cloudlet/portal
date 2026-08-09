@@ -12,11 +12,9 @@ export default async function FunctionDetailPage({
   searchParams,
 }: {
   params: Promise<{ name: string }>;
-  searchParams: Promise<{ tab?: string; container?: string; created?: string }>;
+  searchParams: Promise<{ tab?: string; created?: string }>;
 }) {
   const { name } = await params;
-  const { tab, container, created } = await searchParams;
-  return (
-    <WorkloadDetail type="function" name={name} tab={tab} container={container} created={created} />
-  );
+  const { tab, created } = await searchParams;
+  return <WorkloadDetail type="function" name={name} tab={tab} created={created} />;
 }

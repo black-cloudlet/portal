@@ -12,9 +12,10 @@ import type { PlatformInfo, WorkloadType } from "@/lib/serverless";
  * over the current list with a blurred backdrop. The form keeps its tabbed
  * sections (General / Variables / Secrets / Files / Advanced) inside the dialog.
  *
- * A successful create still redirects to the new workload's detail page (via the
- * server action), which unmounts the dialog; Cancel, the backdrop, the ✕, and
- * Escape all just close it.
+ * A successful create closes the dialog and hands the accepted workload to the
+ * bottom-right creation tracker, which follows the deploy; the list behind the
+ * dialog refreshes to show the new row. Cancel, the backdrop, the ✕, and Escape
+ * all just close it.
  */
 export default function WorkloadCreateDialog({
   type,

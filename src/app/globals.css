@@ -1444,10 +1444,182 @@ code {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .logs-toolbar .input {
   width: auto;
   flex: 0 1 240px;
+}
+/* The pod picker gets the room: pod names are long and the interesting bit is the suffix. */
+.logs-toolbar__pod {
+  flex: 1 1 320px;
+  min-width: 220px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Live-stream state indicator on the Metrics and Logs tabs. */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.live-dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.live-dot--live {
+  color: var(--green-600);
+}
+.live-dot--live::before {
+  background: var(--green-600);
+}
+.live-dot--polling::before {
+  background: var(--yellow-700);
+}
+
+/* Section heading with a status/indicator on the same row. */
+.section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-row .section-title {
+  margin-bottom: 0;
+}
+
+/* One followed log line: a muted time gutter, then the message as logged. */
+.log-line__time {
+  color: var(--text-muted);
+}
+
+/* Build/Pull maintenance action next to Edit/Delete on the detail header. */
+.op-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.op-action__error {
+  color: var(--red-600);
+  font-size: 12px;
+  max-width: 320px;
+}
+
+/* Bottom-right creation-progress toasts (non-blocking, above the content). */
+.toasts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--blue-600);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.toast--ok {
+  border-left-color: var(--green-600);
+}
+.toast--error {
+  border-left-color: var(--red-600);
+}
+.toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.toast__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.toast__title:hover {
+  text-decoration: underline;
+}
+.toast__status {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.toast__spinner {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue-600);
+  border-radius: 50%;
+  animation: toast-spin 0.9s linear infinite;
+}
+@keyframes toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.toast__mark {
+  flex: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.toast__mark--ok {
+  color: var(--green-600);
+}
+.toast__mark--error {
+  color: var(--red-600);
+}
+.toast__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.toast__close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* The machine-readable cause chip next to a Failed status pill. */
+.reason-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+/* Confirmation dialogs are narrower than the create form's modal. */
+.modal--confirm {
+  max-width: 440px;
+}
+.confirm__text {
+  margin-bottom: 16px;
+}
+.confirm__text p {
+  margin: 0;
 }
 
 /* ---------- Redesign: richer nav, view header, list toolbar, cards ---------- */

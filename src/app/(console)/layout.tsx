@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import CreationTrackerProvider from "@/components/CreationTracker";
 import TopBar from "@/components/TopBar";
 import SideNav from "@/components/SideNav";
 import { auth } from "@/auth";
@@ -37,7 +38,11 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
       />
       <div className="shell__body">
         <SideNav services={services} />
-        <main className="shell__main">{children}</main>
+        {/* The tracker lives at the shell level so its bottom-right progress
+            toasts survive navigation while a creation is still deploying. */}
+        <CreationTrackerProvider>
+          <main className="shell__main">{children}</main>
+        </CreationTrackerProvider>
       </div>
     </div>
   );

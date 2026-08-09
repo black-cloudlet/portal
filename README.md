@@ -39,17 +39,45 @@ trusts - so one login works across every offering, and group names are
   endpoint. New workload types are added as more sub-sections.
 - **Workload detail view.** Each row opens a per-workload page with
   sub-tabs - **Status** (source + per-site deploy state and errors),
-  **Variables** and **Secrets** (env, secrets redacted), **Files**,
-  **Advanced** (autoscaling + live per-site replicas/usage), and **Logs**
-  (a pod-log snapshot with a container picker and refresh). It auto-refreshes
-  while a workload is still deploying.
-- **Create, edit, and delete.** A tabbed form (General / Variables / Secrets /
-  Files / Advanced) driven by the `/info` capabilities creates and edits
-  workloads; delete confirms first. Writes go through server actions that
-  forward the SSO token and re-resolve the active group server-side. Edits
-  follow the API's keep-on-write contract - a secret left blank keeps its
-  stored value, the function git token is sent only to rotate, and the
-  container registry token is kept when the username is echoed without one.
+  **Metrics** (live status, replicas and cpu/memory from the `/stats`
+  endpoint, followed over its `/stats/stream` SSE form), **Variables** and
+  **Secrets** (env, secrets redacted), **Files**, **Advanced** (autoscaling),
+  and **Logs** (pick a pod off the streamed `/pods` roster, follow its log via
+  `/logs/pods/{pod}`). It auto-refreshes while a workload is still deploying.
+- **Live streams, the API's way.** The browser consumes the API's Server-Sent
+  Events endpoints with the documented ticket flow: a server action spends the
+  user's SSO token on `POST /api/v1/stream-tickets` (EventSource cannot send an
+  `Authorization` header) and hands the browser a short-lived, single-path
+  `?ticket=` URL to open directly against the API. Tickets are re-minted on
+  every reconnect. When streaming is unavailable - no ticket signing key
+  (`SERVERLESS_STREAM_TICKET_KEY` unset on the API) or the portal's origin
+  missing from the API's `SERVERLESS_CORS_ALLOW_ORIGINS` - the tabs fall back
+  to polling the `?follow=false` / `/stats` snapshots through the server, and
+  say which mode they are in.
+- **Create, edit, delete, build, and pull.** A tabbed form (General /
+  Variables / Secrets / Files / Advanced) driven by the `/info` capabilities
+  creates and edits workloads; delete confirms in the console's own dialog.
+  A create does not navigate away: the dialog closes (or the `/new` page
+  returns to the list), and a bottom-right progress toast follows the deploy
+  on the lightweight `/stats` endpoint until it settles - Ready or Failed,
+  with the failure's machine-readable `reason` - and can be dismissed at any
+  time. Lists poll every few seconds while anything on them is still settling.
+- **Status contract.** Statuses are the API's closed, Kubernetes-phase-style
+  set (Pending / Building / Deploying / Ready / Failed / Terminating; the
+  vocabulary and the terminal subset are published on `/info` `statuses`).
+  Failures carry a `reason` (BuildFailed, ImagePullFailed, CrashLooping, ... -
+  additive, rendered as-is) shown as a chip next to the status pill, with the
+  human-readable `message` in the per-site detail column.
+  The detail header carries the per-offering maintenance action: **Build** for
+  a function (`POST .../build` - build the same source again, for a new base
+  image, a failed build, or a pushed commit) and **Pull image** for a container
+  (`POST .../pull` - cut one revision that re-resolves the tag; the API's 400
+  for a digest-pinned image is surfaced inline). Writes go through server
+  actions that forward the SSO token and re-resolve the active group
+  server-side. Edits follow the API's keep-on-write contract - a secret left
+  blank keeps its stored value, the function git token is sent only to rotate,
+  and the container registry token is kept when the username is echoed without
+  one.
 
 ## Group normalization
 
