@@ -17,12 +17,33 @@ import { getService } from "@/lib/services";
 /** The two workload offerings the console fronts. */
 export type WorkloadType = "function" | "container";
 
+/**
+ * The workload `status` rollup - a closed, Kubernetes-phase-style set. Causes
+ * never get promoted into it (they go on `reason`), so the authoritative list
+ * lives on `GET .../info` (`statuses.workload`); this type mirrors it for the
+ * console's own switches. Per-site `status` follows the same shape.
+ */
+export type WorkloadStatus =
+  "Pending" | "Building" | "Deploying" | "Ready" | "Failed" | "Terminating";
+
+/**
+ * The statuses a poller stops on; anything else is still in flight. Fallback
+ * for when the /info document (`statuses.terminal`) is not at hand - prefer
+ * that where it is.
+ */
+export const TERMINAL_STATUSES: ReadonlySet<string> = new Set(["Ready", "Failed"]);
+
+/** Whether a workload status is settled (per `terminal` from /info, or the fallback). */
+export function isTerminalStatus(status: string, terminal?: string[]): boolean {
+  return terminal ? terminal.includes(status) : TERMINAL_STATUSES.has(status);
+}
+
 export interface WorkloadSummary {
   name: string;
   group: string;
   type: WorkloadType;
   hostname: string;
-  overallStatus: string;
+  status: string;
   size: string | null;
   createdAt: string | null;
   sites: string[];
@@ -34,25 +55,33 @@ export interface ResourceUsage {
   memory: string | null;
 }
 
-/** The deploy/health state of a workload at a single site. */
+/**
+ * The deploy/health state of a workload at a single site. `reason`/`message`
+ * are the Kubernetes-style pair behind a Failed status: `reason` is the
+ * machine-readable cause a client switches on (from /info `statuses.reasons`,
+ * additive - render unknown values as-is), `message` the human-readable detail.
+ */
 export interface SiteStatus {
   site: string;
   status: string;
   revision: string | null;
-  error: string | null;
+  reason: string | null;
+  message: string | null;
   replicas: number | null;
 }
 
-/** One site's live numbers, from `GET .../{name}/stats`. */
+/** One site's live numbers, from `GET .../{name}/stats` (no `message` by design). */
 export interface SiteStats {
   site: string;
   status: string;
+  reason: string | null;
   replicas: number | null;
   usage: ResourceUsage | null;
 }
 
 /**
- * A workload's live state (`GET .../{name}/stats`) - the lightweight endpoint.
+ * A workload's live state (`GET .../{name}/stats`) - the lightweight endpoint,
+ * and the body of the `stats` SSE events.
  *
  * The totals are summed across sites before rounding, so they need not equal
  * the sum of the per-site figures; render them rather than re-adding the parts.
@@ -60,7 +89,9 @@ export interface SiteStats {
  * quietly missing that site.
  */
 export interface WorkloadStats {
-  overallStatus: string;
+  status: string;
+  /** The first recognized per-site reason behind a Failed rollup, or null. */
+  reason: string | null;
   replicas: number | null;
   usage: ResourceUsage | null;
   sites: SiteStats[];
@@ -96,7 +127,9 @@ export interface WorkloadDetail {
   group: string;
   type: WorkloadType;
   hostname: string;
-  overallStatus: string;
+  status: string;
+  /** The first recognized per-site reason behind a Failed rollup, or null. */
+  reason?: string | null;
   size: string | null;
   createdAt: string | null;
   sites: SiteStatus[];
@@ -249,12 +282,14 @@ export interface RuntimeCapability {
 
 /** The status strings a response can carry, so a client hardcodes none. */
 export interface StatusVocabulary {
-  // Values of `overallStatus` a poller switches on.
+  // Values of the workload `status` a poller switches on.
   workload: string[];
   // Values of a per-site `status` inside `sites[]`.
   site: string[];
   // The subset of `workload` a poller should stop on; anything else is in flight.
   terminal: string[];
+  // Values of the workload/per-site `reason` fields (additive; may grow).
+  reasons?: string[];
 }
 
 /** One machine-readable error code and the HTTP status carrying it. */
@@ -707,7 +742,7 @@ export function getPodLogsSnapshot(
  * Build the function's current source again (`POST .../functions/{name}/build`,
  * no body). 202 - the spec is untouched and the running revision keeps serving;
  * the build lands via the platform's build controller. Poll the workload (its
- * `build.state` / `overallStatus` report Building) to watch it.
+ * `build.state` / `status` report Building) to watch it.
  */
 export function buildFunction(
   group: string,

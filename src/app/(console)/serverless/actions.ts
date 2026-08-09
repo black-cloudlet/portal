@@ -77,15 +77,12 @@ export async function createWorkloadAction(
   } catch (err) {
     return toActionError(err);
   }
+  // No redirect: the form stays where the user is (the list, or the /new page
+  // navigating back to it) and hands the accepted workload to the creation
+  // tracker, which follows the deploy from the corner of the screen. The 202
+  // is applied in the background, so the workload may briefly answer NOT_FOUND
+  // - the tracker waits that race out (see lib/pending-create.ts).
   revalidatePath(`/serverless/${typeSegment(type)}`);
-  // A create is accepted (202) and applied in the background, so the detail page
-  // can be rendered before the workload exists and answer NOT_FOUND - a race, not
-  // a failure. `created` stamps when the API accepted it, so the detail view can
-  // wait that out rather than showing the user a red error for their own brand
-  // new workload (see WorkloadDetail's create grace window).
-  redirect(
-    `/serverless/${typeSegment(type)}/${encodeURIComponent(spec.name)}?created=${Date.now()}`,
-  );
 }
 
 export async function updateWorkloadAction(

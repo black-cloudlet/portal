@@ -2,10 +2,11 @@
  * The window after a create in which "not found" means "not yet", not "broken".
  *
  * The Serverless API accepts a create with `202 Accepted` and applies the
- * workload in the background, so the console's post-create redirect regularly
- * beats the platform to it: the user lands on their brand new function's page and
- * the first read answers `NOT_FOUND`. Rendering that as an error tells them their
- * create failed when it is still running.
+ * workload in the background, so a read issued right after the accept regularly
+ * beats the platform to it and answers `NOT_FOUND`. Rendering that as an error
+ * tells the user their create failed when it is still running. Two consumers
+ * wait the race out: the creation tracker's corner toast, and the detail view
+ * when a visit carries the `?created=` stamp.
  *
  * The create action stamps the moment the API accepted the request onto the
  * redirect (`?created=<epoch ms>`); inside the window below, the detail view

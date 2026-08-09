@@ -7,7 +7,12 @@ import { useMemo, useState, type ReactNode } from "react";
 import AutoRefresh from "@/components/AutoRefresh";
 import Icon from "@/components/Icon";
 import StatusPill from "@/components/StatusPill";
-import { typeSegment, type WorkloadSummary, type WorkloadType } from "@/lib/serverless";
+import {
+  isTerminalStatus,
+  typeSegment,
+  type WorkloadSummary,
+  type WorkloadType,
+} from "@/lib/serverless";
 
 /** Show the API's naive local timestamp as-is (no timezone math). */
 function fmtDate(v: string | null): string {
@@ -58,10 +63,14 @@ export default function WorkloadList({
 
   const label = type === "function" ? "function" : "container";
 
+  // While anything on the list is still settling (not Ready/Failed), poll fast
+  // so a just-created workload's progress shows up within seconds.
+  const settling = workloads.some((w) => !isTerminalStatus(w.status));
+
   return (
     <div className="stack">
       {/* Keep the list fresh (new workloads, status changes) without a manual reload. */}
-      <AutoRefresh intervalMs={15000} />
+      <AutoRefresh intervalMs={settling ? 3000 : 15000} />
       <div className="listbar">
         <div className="listbar__views" role="group" aria-label="View">
           <button
@@ -118,7 +127,7 @@ export default function WorkloadList({
               <Link key={w.name} href={href} className="wl-card">
                 <div className="wl-card__head">
                   <span className="wl-card__name">{w.name}</span>
-                  <StatusPill status={w.overallStatus} />
+                  <StatusPill status={w.status} />
                 </div>
                 <a
                   className="wl-card__host"
@@ -184,7 +193,7 @@ export default function WorkloadList({
                       </Link>
                     </td>
                     <td>
-                      <StatusPill status={w.overallStatus} />
+                      <StatusPill status={w.status} />
                     </td>
                     <td>
                       <a

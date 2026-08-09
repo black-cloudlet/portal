@@ -6,21 +6,19 @@ import DeleteWorkloadButton from "@/components/DeleteWorkloadButton";
 import Icon from "@/components/Icon";
 import LiveStats from "@/components/LiveStats";
 import PodLogsViewer from "@/components/PodLogsViewer";
-import StatusPill from "@/components/StatusPill";
+import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
   getWorkloadStats,
+  isTerminalStatus,
   typeSegment,
   type WorkloadDetail as WorkloadDetailData,
   type WorkloadType,
 } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
-
-/** Statuses that are still settling; while in one of these we auto-refresh. */
-const PENDING_STATUSES = new Set(["Pending", "Building", "Deploying", "Terminating"]);
 const TAB_IDS: DetailTab[] = [
   "status",
   "metrics",
@@ -98,7 +96,8 @@ export default async function WorkloadDetail({
 
   return (
     <div className="detail">
-      <AutoRefresh intervalMs={PENDING_STATUSES.has(wl.overallStatus) ? 5000 : 15000} />
+      {/* Anything not terminal (Ready/Failed) is still in flight - poll fast. */}
+      <AutoRefresh intervalMs={isTerminalStatus(wl.status) ? 15000 : 3000} />
 
       <div className="detail__bar">
         <Link className="backlink" href={`/serverless/${seg}`}>
@@ -109,7 +108,7 @@ export default async function WorkloadDetail({
       <div className="detail__head">
         <div>
           <h2 className="detail__title">
-            {wl.name} <StatusPill status={wl.overallStatus} />
+            {wl.name} <StatusPill status={wl.status} /> <ReasonChip reason={wl.reason} />
           </h2>
           <p className="detail__sub">
             <a href={`https://${wl.hostname}`} target="_blank" rel="noreferrer">
@@ -269,10 +268,10 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                   <tr key={s.site}>
                     <td>{s.site}</td>
                     <td>
-                      <StatusPill status={s.status} />
+                      <StatusPill status={s.status} /> <ReasonChip reason={s.reason} />
                     </td>
                     <td>{s.revision ?? "—"}</td>
-                    <td>{s.error ? <span className="text-error">{s.error}</span> : "—"}</td>
+                    <td>{s.message ? <span className="text-error">{s.message}</span> : "—"}</td>
                   </tr>
                 ))}
               </tbody>

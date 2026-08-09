@@ -44,7 +44,7 @@ afterEach(() => {
 
 describe("getWorkloadStats", () => {
   it("calls the stats endpoint of the workload's own collection", async () => {
-    const calls = stubFetch({ overallStatus: "Ready", replicas: 0, usage: null, sites: [] });
+    const calls = stubFetch({ status: "Ready", reason: null, replicas: 0, usage: null, sites: [] });
 
     await getWorkloadStats("function", "team", "image-resizer", "tok");
     await getWorkloadStats("container", "team", "orders-api", "tok");
@@ -56,7 +56,7 @@ describe("getWorkloadStats", () => {
   });
 
   it("percent-encodes the group and name", async () => {
-    const calls = stubFetch({ overallStatus: "Ready", replicas: 0, usage: null, sites: [] });
+    const calls = stubFetch({ status: "Ready", reason: null, replicas: 0, usage: null, sites: [] });
 
     await getWorkloadStats("function", "team space", "a/b", "tok");
 
@@ -65,12 +65,19 @@ describe("getWorkloadStats", () => {
 
   it("reads the totals and the per-site rows straight off the response", async () => {
     stubFetch({
-      overallStatus: "Ready",
+      status: "Ready",
+      reason: null,
       replicas: 3,
       usage: { cpu: "210m", memory: "355Mi" },
       sites: [
-        { site: "central", status: "Ready", replicas: 2, usage: { cpu: "120m", memory: "180Mi" } },
-        { site: "south", status: "Ready", replicas: 1, usage: null },
+        {
+          site: "central",
+          status: "Ready",
+          reason: null,
+          replicas: 2,
+          usage: { cpu: "120m", memory: "180Mi" },
+        },
+        { site: "south", status: "Ready", reason: null, replicas: 1, usage: null },
       ],
     });
 
@@ -86,7 +93,7 @@ describe("getWorkloadStats", () => {
 
 describe("build and pull", () => {
   it("POSTs the function build trigger with no body", async () => {
-    const calls = stubFetch({ overallStatus: "Pending" });
+    const calls = stubFetch({ status: "Pending" });
 
     await buildFunction("team", "image-resizer", "tok");
 
@@ -100,7 +107,7 @@ describe("build and pull", () => {
   });
 
   it("POSTs the container pull trigger with no body", async () => {
-    const calls = stubFetch({ overallStatus: "Pending" });
+    const calls = stubFetch({ status: "Pending" });
 
     await pullContainer("team", "orders-api", "tok");
 

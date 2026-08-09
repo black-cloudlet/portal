@@ -57,6 +57,17 @@ trusts - so one login works across every offering, and group names are
 - **Create, edit, delete, build, and pull.** A tabbed form (General /
   Variables / Secrets / Files / Advanced) driven by the `/info` capabilities
   creates and edits workloads; delete confirms in the console's own dialog.
+  A create does not navigate away: the dialog closes (or the `/new` page
+  returns to the list), and a bottom-right progress toast follows the deploy
+  on the lightweight `/stats` endpoint until it settles - Ready or Failed,
+  with the failure's machine-readable `reason` - and can be dismissed at any
+  time. Lists poll every few seconds while anything on them is still settling.
+- **Status contract.** Statuses are the API's closed, Kubernetes-phase-style
+  set (Pending / Building / Deploying / Ready / Failed / Terminating; the
+  vocabulary and the terminal subset are published on `/info` `statuses`).
+  Failures carry a `reason` (BuildFailed, ImagePullFailed, CrashLooping, ... -
+  additive, rendered as-is) shown as a chip next to the status pill, with the
+  human-readable `message` in the per-site detail column.
   The detail header carries the per-offering maintenance action: **Build** for
   a function (`POST .../build` - build the same source again, for a new base
   image, a failed build, or a pushed commit) and **Pull image** for a container

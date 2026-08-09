@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { getStatsAction, mintStreamUrlAction } from "@/app/(console)/serverless/actions";
-import StatusPill from "@/components/StatusPill";
+import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import { openTicketedStream } from "@/lib/stream";
 import type { ResourceUsage, WorkloadStats, WorkloadType } from "@/lib/serverless";
 
@@ -44,6 +44,10 @@ export default function LiveStats({
           setStats(data as WorkloadStats);
           setMode("live");
         },
+        // The stream reached its server-side time limit - a routine rollover,
+        // not an error. The server closes the connection next; the helper's
+        // reconnect path re-mints a ticket and reopens.
+        end: () => {},
         // The workload is gone or no site could answer; the reconnect/backoff
         // in the stream helper takes it from here.
         error: () => {},
@@ -99,7 +103,7 @@ export default function LiveStats({
           <div>
             <dt>Status</dt>
             <dd>
-              <StatusPill status={stats.overallStatus} />
+              <StatusPill status={stats.status} /> <ReasonChip reason={stats.reason} />
             </dd>
           </div>
           <div>
@@ -144,7 +148,7 @@ export default function LiveStats({
                   <tr key={s.site}>
                     <td>{s.site}</td>
                     <td>
-                      <StatusPill status={s.status} />
+                      <StatusPill status={s.status} /> <ReasonChip reason={s.reason} />
                     </td>
                     <td>{s.replicas ?? "—"}</td>
                     <td>{usageCell(s.usage, "cpu")}</td>

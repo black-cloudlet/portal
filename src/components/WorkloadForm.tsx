@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import {
@@ -8,6 +9,7 @@ import {
   updateWorkloadAction,
   type ActionError,
 } from "@/app/(console)/serverless/actions";
+import { useCreationTracker } from "@/components/CreationTracker";
 import Icon from "@/components/Icon";
 import type {
   ContainerCreateInput,
@@ -53,6 +55,16 @@ const FORM_TABS = [
 ] as const;
 type FormTab = (typeof FORM_TABS)[number]["id"];
 
+/**
+ * The platform's cap on a workload name. Mirrors the API's per-field request
+ * schema (maxLength on /openapi.json): names are capped so that {name}-{group}
+ * always fits the 63-character DNS label, with per-field rather than combined
+ * enforcement. The API remains the authority; this only pre-empts a round trip.
+ */
+const NAME_MAX_LENGTH = 39;
+/** DNS-1123 label - the shape of a workload name. */
+const DNS1123_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+
 /** Time-unit choices for the scale-down delay (value + Go-duration suffix). */
 const TIME_UNITS = [
   { id: "s", label: "seconds" },
@@ -90,6 +102,8 @@ export default function WorkloadForm({
   onClose,
 }: Props) {
   const isModal = variant === "modal";
+  const router = useRouter();
+  const { track } = useCreationTracker();
   const isFn = type === "function";
   const typeLabel = isFn ? "Function" : "Container";
   const seg = isFn ? "functions" : "containers";
@@ -206,16 +220,24 @@ export default function WorkloadForm({
       return { tab: "general", message: "Name is required." };
     if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
       return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
-    // The API's real limit is on name and group *together* (their join becomes the
-    // object name), published via /info so we can catch it before submitting.
-    if (mode === "create" && info.naming && name.trim() !== "") {
-      const composed = info.naming.template
-        .replace("{name}", name.trim())
-        .replace("{group}", group);
-      if (composed.length > info.naming.maxLength)
+    // Per-field limits, matching the API's request schema (/openapi.json): a
+    // name is a DNS-1123 label of at most NAME_MAX_LENGTH characters. The old
+    // combined {name}-{group} <= 63 rule is now impossible to violate under the
+    // per-field caps, so it is no longer pre-checked here. The group is never
+    // length-checked client-side: its cap applies to the *normalized* form, and
+    // a raw value (e.g. with a "/ggd-1234-" prefix) may legitimately be longer.
+    if (mode === "create" && name.trim() !== "") {
+      const n = name.trim();
+      if (n.length > NAME_MAX_LENGTH)
         return {
           tab: "general",
-          message: `Name too long: "${composed}" is ${composed.length} characters (max ${info.naming.maxLength}).`,
+          message: `Name too long: ${n.length} characters (max ${NAME_MAX_LENGTH}).`,
+        };
+      if (!DNS1123_LABEL.test(n))
+        return {
+          tab: "general",
+          message:
+            "Name must be lowercase letters, digits and '-', starting and ending alphanumeric.",
         };
     }
     if (isFn) {
@@ -347,7 +369,19 @@ export default function WorkloadForm({
         };
         res = await updateWorkloadAction("container", initial!.name, spec);
       }
-      if (res?.error) setError(res);
+      if (res?.error) {
+        setError(res);
+        return;
+      }
+      if (mode === "create") {
+        // Accepted (202): no redirect to the workload page. Hand the deploy to
+        // the corner tracker, put the user back on the list (or just close the
+        // dialog if they are already there), and refresh so the new row shows.
+        track(type, name.trim());
+        if (isModal) onClose?.();
+        else router.push(`/serverless/${seg}`);
+        router.refresh();
+      }
     });
   }
 
@@ -430,6 +464,7 @@ export default function WorkloadForm({
               <input
                 className="input"
                 value={name}
+                maxLength={NAME_MAX_LENGTH}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={`${typeLabel.toLowerCase()} name`}
               />

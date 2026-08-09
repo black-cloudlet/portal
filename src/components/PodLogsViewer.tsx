@@ -92,6 +92,9 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
           setRoster(data as PodRoster);
           setRosterMode("live");
         },
+        // Routine rollover at the stream's time limit; the helper reconnects
+        // with a fresh ticket when the server closes the connection.
+        end: () => {},
         error: () => {},
       },
       onDown: () => setRosterMode("polling"),
