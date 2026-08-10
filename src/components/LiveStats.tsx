@@ -95,9 +95,6 @@ export default function LiveStats({
       <section>
         <div className="section-row">
           <h3 className="section-title">Totals</h3>
-          <span className={`live-dot live-dot--${mode}`}>
-            {mode === "live" ? "live" : mode === "polling" ? "polling" : "connecting…"}
-          </span>
         </div>
         <dl className="meta-grid">
           <div>

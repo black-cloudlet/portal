@@ -1060,10 +1060,23 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* The log pane reads as a console: dark in both themes, roomy, and quiet.
+   Fixed colors on purpose - a terminal does not follow the page theme. */
 .code-block--logs {
-  max-height: 420px;
+  max-height: min(65vh, 720px);
+  min-height: 260px;
   overflow-y: auto;
   white-space: pre-wrap;
+  background: #10151a;
+  color: #d7dee5;
+  border: 1px solid #262e36;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #3a444e transparent;
 }
 
 /* Forms */
@@ -1458,32 +1471,6 @@ code {
   font-size: 12px;
 }
 
-/* Live-stream state indicator on the Metrics and Logs tabs. */
-.live-dot {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.live-dot::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-.live-dot--live {
-  color: var(--green-600);
-}
-.live-dot--live::before {
-  background: var(--green-600);
-}
-.live-dot--polling::before {
-  background: var(--yellow-700);
-}
-
 /* Section heading with a status/indicator on the same row. */
 .section-row {
   display: flex;
@@ -1495,9 +1482,15 @@ code {
   margin-bottom: 0;
 }
 
-/* One followed log line: a muted time gutter, then the message as logged. */
-.log-line__time {
-  color: var(--text-muted);
+/* One followed log line, exactly as the workload wrote it. */
+.log-line {
+  display: block;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 -4px;
+}
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* Build/Pull maintenance action next to Edit/Delete on the detail header. */

@@ -13,13 +13,6 @@ import type { LogLine, PodInfo, PodRoster, WorkloadType } from "@/lib/serverless
 /** Keep the last N lines so a chatty pod cannot grow the tab unbounded. */
 const MAX_LINES = 2000;
 
-/** hh:mm:ss for the line gutter; the API renders full RFC 3339 timestamps. */
-function fmtTime(v: string | null): string {
-  if (!v) return "";
-  const t = v.indexOf("T");
-  return t === -1 ? v : v.slice(t + 1, t + 9);
-}
-
 /**
  * The Logs tab: pick a pod, follow its log.
  *
@@ -227,19 +220,6 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
 
   const selected: PodInfo | undefined = roster?.pods.find((p) => p.pod === pod);
 
-  // One state chip for the whole tab: the log stream's state wins while a pod
-  // is followed; before that it reflects how the roster is being read.
-  const indicator =
-    logMode === "live"
-      ? { cls: "live", label: "following" }
-      : logMode === "polling"
-        ? { cls: "polling", label: "polling" }
-        : logMode === "ended"
-          ? { cls: "ended", label: "ended" }
-          : rosterMode === "polling"
-            ? { cls: "polling", label: "polling" }
-            : { cls: "connecting", label: "connecting…" };
-
   return (
     <div className="stack">
       <form
@@ -274,7 +254,6 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
         <button type="submit" className="btn btn--sm">
           Load
         </button>
-        <span className={`live-dot live-dot--${indicator.cls}`}>{indicator.label}</span>
       </form>
 
       {roster && (
@@ -321,7 +300,6 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
               : "(no log lines yet)"
             : lines.map(({ id, line }) => (
                 <span key={id} className="log-line">
-                  {line.time && <span className="log-line__time">{fmtTime(line.time)} </span>}
                   {line.message}
                   {"\n"}
                 </span>
