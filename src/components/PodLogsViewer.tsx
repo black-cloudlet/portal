@@ -12,8 +12,6 @@ import type { LogLine, PodInfo, PodRoster, WorkloadType } from "@/lib/serverless
 
 /** Keep the last N lines so a chatty pod cannot grow the tab unbounded. */
 const MAX_LINES = 2000;
-/** How far back a freshly-opened follow starts. */
-const SINCE_SECONDS = 300;
 
 /** hh:mm:ss for the line gutter; the API renders full RFC 3339 timestamps. */
 function fmtTime(v: string | null): string {
@@ -135,11 +133,14 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const stream = openTicketedStream({
       mint: async () => {
+        // tailLines, not a since-window: an existing pod may have been quiet
+        // for hours, and "the last 5 minutes" of that is an empty pane. The
+        // newest N lines show its recent history however old, then follow on.
         const res = await mintStreamUrlAction(type, name, {
           kind: "logs",
           pod,
           container,
-          sinceSeconds: SINCE_SECONDS,
+          tailLines: MAX_LINES,
         });
         return "url" in res ? res.url : null;
       },

@@ -142,7 +142,14 @@ export async function pullContainerAction(name: string): Promise<ActionError | v
 export type StreamSpec =
   | { kind: "pods" }
   | { kind: "stats" }
-  | { kind: "logs"; pod: string; container?: string; sinceSeconds?: number };
+  | {
+      kind: "logs";
+      pod: string;
+      container?: string;
+      sinceSeconds?: number;
+      /** Open at the newest N lines however old they are (clamped by the API). */
+      tailLines?: number;
+    };
 
 /**
  * Mint a stream ticket for one of this workload's SSE endpoints and hand the
@@ -174,6 +181,7 @@ export async function mintStreamUrlAction(
     if (stream.kind === "logs") {
       if (stream.container) q.set("container", stream.container);
       if (stream.sinceSeconds) q.set("sinceSeconds", String(stream.sinceSeconds));
+      if (stream.tailLines) q.set("tailLines", String(stream.tailLines));
     }
     return { url: `${streamBaseUrl()}${path}?${q}` };
   } catch (err) {
