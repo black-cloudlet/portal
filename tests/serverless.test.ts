@@ -44,7 +44,13 @@ afterEach(() => {
 
 describe("getWorkloadStats", () => {
   it("calls the stats endpoint of the workload's own collection", async () => {
-    const calls = stubFetch({ status: "Ready", reason: null, replicas: 0, usage: null, sites: [] });
+    const calls = stubFetch({
+      status: "Ready",
+      reason: null,
+      replicas: 0,
+      usage: null,
+      regions: [],
+    });
 
     await getWorkloadStats("function", "team", "image-resizer", "tok");
     await getWorkloadStats("container", "team", "orders-api", "tok");
@@ -56,28 +62,34 @@ describe("getWorkloadStats", () => {
   });
 
   it("percent-encodes the group and name", async () => {
-    const calls = stubFetch({ status: "Ready", reason: null, replicas: 0, usage: null, sites: [] });
+    const calls = stubFetch({
+      status: "Ready",
+      reason: null,
+      replicas: 0,
+      usage: null,
+      regions: [],
+    });
 
     await getWorkloadStats("function", "team space", "a/b", "tok");
 
     expect(calls[0].url).toBe(`${BASE}/api/v1/groups/team%20space/functions/a%2Fb/stats`);
   });
 
-  it("reads the totals and the per-site rows straight off the response", async () => {
+  it("reads the totals and the per-region rows straight off the response", async () => {
     stubFetch({
       status: "Ready",
       reason: null,
       replicas: 3,
       usage: { cpu: "210m", memory: "355Mi" },
-      sites: [
+      regions: [
         {
-          site: "central",
+          region: "central",
           status: "Ready",
           reason: null,
           replicas: 2,
           usage: { cpu: "120m", memory: "180Mi" },
         },
-        { site: "south", status: "Ready", reason: null, replicas: 1, usage: null },
+        { region: "south", status: "Ready", reason: null, replicas: 1, usage: null },
       ],
     });
 
@@ -85,9 +97,9 @@ describe("getWorkloadStats", () => {
 
     expect(stats.replicas).toBe(3);
     expect(stats.usage?.cpu).toBe("210m");
-    expect(stats.sites.map((s) => s.site)).toEqual(["central", "south"]);
-    // a site that reported nothing stays null rather than becoming a zero
-    expect(stats.sites[1].usage).toBeNull();
+    expect(stats.regions.map((s) => s.region)).toEqual(["central", "south"]);
+    // a region that reported nothing stays null rather than becoming a zero
+    expect(stats.regions[1].usage).toBeNull();
   });
 });
 
@@ -154,7 +166,7 @@ describe("pods and pod-log snapshots", () => {
       name: "orders",
       group: "team",
       type: "function",
-      site: "c",
+      region: "c",
       pods: [],
     });
 
@@ -168,7 +180,7 @@ describe("pods and pod-log snapshots", () => {
       name: "orders",
       group: "team",
       type: "function",
-      site: "c",
+      region: "c",
       pod: "orders-x2wql",
       container: "user-container",
       revision: null,

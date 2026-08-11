@@ -21,7 +21,7 @@ export type WorkloadType = "function" | "container";
  * The workload `status` rollup - a closed, Kubernetes-phase-style set. Causes
  * never get promoted into it (they go on `reason`), so the authoritative list
  * lives on `GET .../info` (`statuses.workload`); this type mirrors it for the
- * console's own switches. Per-site `status` follows the same shape.
+ * console's own switches. Per-region `status` follows the same shape.
  */
 export type WorkloadStatus =
   "Pending" | "Building" | "Deploying" | "Ready" | "Failed" | "Terminating";
@@ -46,7 +46,7 @@ export interface WorkloadSummary {
   status: string;
   size: string | null;
   createdAt: string | null;
-  sites: string[];
+  regions: string[];
 }
 
 /** Live resource consumption summed over a workload's running pods. */
@@ -56,13 +56,13 @@ export interface ResourceUsage {
 }
 
 /**
- * The deploy/health state of a workload at a single site. `reason`/`message`
+ * The deploy/health state of a workload at a single region. `reason`/`message`
  * are the Kubernetes-style pair behind a Failed status: `reason` is the
  * machine-readable cause a client switches on (from /info `statuses.reasons`,
  * additive - render unknown values as-is), `message` the human-readable detail.
  */
-export interface SiteStatus {
-  site: string;
+export interface RegionStatus {
+  region: string;
   status: string;
   revision: string | null;
   reason: string | null;
@@ -70,9 +70,9 @@ export interface SiteStatus {
   replicas: number | null;
 }
 
-/** One site's live numbers, from `GET .../{name}/stats` (no `message` by design). */
-export interface SiteStats {
-  site: string;
+/** One region's live numbers, from `GET .../{name}/stats` (no `message` by design). */
+export interface RegionStats {
+  region: string;
   status: string;
   reason: string | null;
   replicas: number | null;
@@ -83,18 +83,18 @@ export interface SiteStats {
  * A workload's live state (`GET .../{name}/stats`) - the lightweight endpoint,
  * and the body of the `stats` SSE events.
  *
- * The totals are summed across sites before rounding, so they need not equal
- * the sum of the per-site figures; render them rather than re-adding the parts.
- * Either is null when a site could not be measured, rather than a figure
- * quietly missing that site.
+ * The totals are summed across regions before rounding, so they need not equal
+ * the sum of the per-region figures; render them rather than re-adding the parts.
+ * Either is null when a region could not be measured, rather than a figure
+ * quietly missing that region.
  */
 export interface WorkloadStats {
   status: string;
-  /** The first recognized per-site reason behind a Failed rollup, or null. */
+  /** The first recognized per-region reason behind a Failed rollup, or null. */
   reason: string | null;
   replicas: number | null;
   usage: ResourceUsage | null;
-  sites: SiteStats[];
+  regions: RegionStats[];
 }
 
 /** An env var read back from a workload; secret values are redacted to null. */
@@ -128,11 +128,11 @@ export interface WorkloadDetail {
   type: WorkloadType;
   hostname: string;
   status: string;
-  /** The first recognized per-site reason behind a Failed rollup, or null. */
+  /** The first recognized per-region reason behind a Failed rollup, or null. */
   reason?: string | null;
   size: string | null;
   createdAt: string | null;
-  sites: SiteStatus[];
+  regions: RegionStatus[];
   statusUrl: string | null;
   scaling: Scaling | null;
   env: EnvVarView[];
@@ -146,7 +146,7 @@ export interface WorkloadDetail {
   branch?: string | null;
   // Sub-directory inside the repo the function is built from; null/"" is the root.
   path?: string | null;
-  // The function's image build state on the local site (kpack). Absent on a site
+  // The function's image build state on the local region (kpack). Absent on a region
   // that has never built it.
   build?: BuildStatusView | null;
   // Container source.
@@ -166,7 +166,7 @@ export interface BuildStatusView {
 }
 
 /**
- * One of the workload's pods on the local site, from the `/pods` roster.
+ * One of the workload's pods on the local region, from the `/pods` roster.
  * `usage` is per pod and null for a pod too new to have been scraped.
  */
 export interface PodInfo {
@@ -181,14 +181,14 @@ export interface PodInfo {
 
 /**
  * The `pods` event / `?follow=false` snapshot of `GET .../{name}/pods`: which
- * pods the workload has on the local site right now. Empty is a normal state
+ * pods the workload has on the local region right now. Empty is a normal state
  * (scaled to zero), not an error.
  */
 export interface PodRoster {
   name: string;
   group: string;
   type: WorkloadType;
-  site: string;
+  region: string;
   pods: PodInfo[];
 }
 
@@ -210,7 +210,7 @@ export interface PodLogSnapshot {
   name: string;
   group: string;
   type: WorkloadType;
-  site: string;
+  region: string;
   pod: string;
   container: string;
   revision: string | null;
@@ -284,11 +284,11 @@ export interface RuntimeCapability {
 export interface StatusVocabulary {
   // Values of the workload `status` a poller switches on.
   workload: string[];
-  // Values of a per-site `status` inside `sites[]`.
-  site: string[];
+  // Values of a per-region `status` inside `regions[]`.
+  region: string[];
   // The subset of `workload` a poller should stop on; anything else is in flight.
   terminal: string[];
-  // Values of the workload/per-site `reason` fields (additive; may grow).
+  // Values of the workload/per-region `reason` fields (additive; may grow).
   reasons?: string[];
 }
 
@@ -311,7 +311,7 @@ export interface NamingRule {
  */
 export interface BasePlatformInfo {
   version: string;
-  sites: string[];
+  regions: string[];
   sizes: string[];
   scaling: ScalingCapabilities;
   routeDomain: string;
@@ -391,7 +391,7 @@ export interface FunctionCreateInput {
   files: FileInput[];
   scaling: ScalingInput;
   size: string;
-  sites?: string[] | null;
+  regions?: string[] | null;
   hostname?: string | null;
 }
 
@@ -429,7 +429,7 @@ export interface ContainerCreateInput {
   files: FileInput[];
   scaling: ScalingInput;
   size: string;
-  sites?: string[] | null;
+  regions?: string[] | null;
   hostname?: string | null;
 }
 
@@ -701,7 +701,7 @@ export function streamBaseUrl(): string {
 }
 
 /**
- * One JSON roster of the workload's pods on the local site
+ * One JSON roster of the workload's pods on the local region
  * (`GET .../{name}/pods?follow=false`) - the non-streaming form, for polling.
  */
 export function getPodsSnapshot(
@@ -758,7 +758,7 @@ export function buildFunction(
 
 /**
  * Pull the container's image tag again (`POST .../containers/{name}/pull`, no
- * body). 202 - cuts one new revision in every site so the tag is resolved to a
+ * body). 202 - cuts one new revision in every region so the tag is resolved to a
  * digest again. A digest-pinned image is a 400 (nothing newer to pull).
  */
 export function pullContainer(

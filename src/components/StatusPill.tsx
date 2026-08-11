@@ -1,7 +1,7 @@
 /**
- * Colour tone for a workload/site status string. The vocabulary is the API's
+ * Colour tone for a workload/region status string. The vocabulary is the API's
  * closed, Kubernetes-phase-style set (Pending | Building | Deploying | Ready |
- * Failed | Terminating, plus per-site Timeout) published on /info `statuses`;
+ * Failed | Terminating, plus per-region Timeout) published on /info `statuses`;
  * anything unrecognized renders muted rather than breaking.
  */
 export function statusTone(status: string): "ok" | "error" | "warn" | "muted" {

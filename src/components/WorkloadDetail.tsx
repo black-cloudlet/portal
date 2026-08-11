@@ -184,7 +184,7 @@ function ProvisioningPanel({ type, name }: { type: WorkloadType; name: string })
   );
 }
 
-/** Source (image/git) plus per-site deploy/health status and any error. */
+/** Source (image/git) plus per-region deploy/health status and any error. */
 function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
   return (
     <div className="stack">
@@ -249,24 +249,24 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
       </section>
 
       <section>
-        <h3 className="section-title">Sites</h3>
-        {wl.sites.length === 0 ? (
-          <div className="notice">No per-site status yet.</div>
+        <h3 className="section-title">Regions</h3>
+        {wl.regions.length === 0 ? (
+          <div className="notice">No per-region status yet.</div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Site</th>
+                  <th>Region</th>
                   <th>Status</th>
                   <th>Revision</th>
                   <th>Details</th>
                 </tr>
               </thead>
               <tbody>
-                {wl.sites.map((s) => (
-                  <tr key={s.site}>
-                    <td>{s.site}</td>
+                {wl.regions.map((s) => (
+                  <tr key={s.region}>
+                    <td>{s.region}</td>
                     <td>
                       <StatusPill status={s.status} /> <ReasonChip reason={s.reason} />
                     </td>

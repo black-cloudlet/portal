@@ -32,7 +32,7 @@ type Sort = "name" | "createdAt";
  * or rows. Purely client-side over the already-fetched summaries, so filtering,
  * sorting, and switching views never round-trips. Every card/row links to the
  * workload's detail view; the fields shown are the ones the list endpoint
- * returns (status, size, sites, created) plus the outbound host.
+ * returns (status, size, regions, created) plus the outbound host.
  */
 export default function WorkloadList({
   workloads,
@@ -144,8 +144,8 @@ export default function WorkloadList({
                     <dd>{w.size ?? "—"}</dd>
                   </div>
                   <div>
-                    <dt>Sites</dt>
-                    <dd>{w.sites.join(", ") || "All"}</dd>
+                    <dt>Regions</dt>
+                    <dd>{w.regions.join(", ") || "All"}</dd>
                   </div>
                   <div>
                     <dt>Created</dt>
@@ -165,7 +165,7 @@ export default function WorkloadList({
                 <th>Status</th>
                 <th>Host</th>
                 <th>Size</th>
-                <th>Sites</th>
+                <th>Regions</th>
                 <th>Created</th>
               </tr>
             </thead>
@@ -206,7 +206,7 @@ export default function WorkloadList({
                       </a>
                     </td>
                     <td>{w.size ?? "—"}</td>
-                    <td>{w.sites.join(", ") || "All"}</td>
+                    <td>{w.regions.join(", ") || "All"}</td>
                     <td>{fmtDate(w.createdAt)}</td>
                   </tr>
                 );

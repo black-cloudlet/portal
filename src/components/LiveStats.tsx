@@ -48,7 +48,7 @@ export default function LiveStats({
         // not an error. The server closes the connection next; the helper's
         // reconnect path re-mints a ticket and reopens.
         end: () => {},
-        // The workload is gone or no site could answer; the reconnect/backoff
+        // The workload is gone or no region could answer; the reconnect/backoff
         // in the stream helper takes it from here.
         error: () => {},
       },
@@ -81,9 +81,9 @@ export default function LiveStats({
     };
   }, [mode, type, name]);
 
-  // The API nulls a total when a site could not be measured, so say which it is
+  // The API nulls a total when a region could not be measured, so say which it is
   // rather than showing a dash that reads as "zero".
-  const unmeasured = stats.usage == null && stats.sites.some((s) => s.usage != null);
+  const unmeasured = stats.usage == null && stats.regions.some((s) => s.usage != null);
 
   return (
     <div className="stack">
@@ -118,22 +118,22 @@ export default function LiveStats({
         </dl>
         {unmeasured && (
           <p className="text-muted">
-            A site could not be measured, so the totals are not shown - a figure missing a whole
-            site would understate the workload. The per-site rows below show what did report.
+            A region could not be measured, so the totals are not shown - a figure missing a whole
+            region would understate the workload. The per-region rows below show what did report.
           </p>
         )}
       </section>
 
       <section>
-        <h3 className="section-title">Per site</h3>
-        {stats.sites.length === 0 ? (
-          <div className="notice">No running sites.</div>
+        <h3 className="section-title">Per region</h3>
+        {stats.regions.length === 0 ? (
+          <div className="notice">No running regions.</div>
         ) : (
           <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Site</th>
+                  <th>Region</th>
                   <th>Status</th>
                   <th>Replicas</th>
                   <th>CPU</th>
@@ -141,9 +141,9 @@ export default function LiveStats({
                 </tr>
               </thead>
               <tbody>
-                {stats.sites.map((s) => (
-                  <tr key={s.site}>
-                    <td>{s.site}</td>
+                {stats.regions.map((s) => (
+                  <tr key={s.region}>
+                    <td>{s.region}</td>
                     <td>
                       <StatusPill status={s.status} /> <ReasonChip reason={s.reason} />
                     </td>
