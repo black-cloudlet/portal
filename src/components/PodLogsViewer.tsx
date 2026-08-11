@@ -134,8 +134,8 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
 
       {roster && (
         <p className="text-muted">
-          Pods on site <strong>{roster.site}</strong>. A scaled-to-zero workload has no pods; logs
-          reach back only as far as the node keeps them.
+          Pods on region <strong>{roster.region}</strong>. A scaled-to-zero workload has no pods;
+          logs reach back only as far as the node keeps them.
         </p>
       )}
 

@@ -12,10 +12,10 @@ describe("isNotFound", () => {
   });
 
   it("does not match any other failure", () => {
-    // A workload that exists but is refused, or a site that could not answer, is
+    // A workload that exists but is refused, or a region that could not answer, is
     // a real error - waiting on it would hide it behind a spinner.
     expect(isNotFound(new ServerlessApiError("forbidden", 403, "FORBIDDEN"))).toBe(false);
-    expect(isNotFound(new ServerlessApiError("site unreachable", 503))).toBe(false);
+    expect(isNotFound(new ServerlessApiError("region unreachable", 503))).toBe(false);
     expect(isNotFound(new Error("Could not reach the Serverless API"))).toBe(false);
     expect(isNotFound(undefined)).toBe(false);
   });

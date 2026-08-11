@@ -43,7 +43,7 @@ export default function DeleteWorkloadButton({ type, name }: { type: WorkloadTyp
           }}
         >
           <p>
-            Delete {type} <strong>{name}</strong> from every site? Its revisions, routes, and
+            Delete {type} <strong>{name}</strong> from every region? Its revisions, routes, and
             derived secrets are removed. This cannot be undone.
           </p>
         </ConfirmDialog>

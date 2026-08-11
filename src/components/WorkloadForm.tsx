@@ -317,8 +317,8 @@ export default function WorkloadForm({
     startTransition(async () => {
       let res: ActionError | void;
       if (mode === "create") {
-        // Placement is always cluster-wide: send no sites so the API deploys to
-        // every site (the console does not expose per-site targeting).
+        // Placement is always cluster-wide: send no regions so the API deploys to
+        // every region (the console does not expose per-region targeting).
         if (isFn) {
           const spec: FunctionCreateInput = {
             name,
@@ -328,7 +328,7 @@ export default function WorkloadForm({
             gitToken,
             runtime,
             version: version.trim() === "" ? null : version,
-            sites: null,
+            regions: null,
             ...common,
           };
           res = await createWorkloadAction("function", spec);
@@ -338,7 +338,7 @@ export default function WorkloadForm({
             image,
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
-            sites: null,
+            regions: null,
             ...common,
           };
           res = await createWorkloadAction("container", spec);

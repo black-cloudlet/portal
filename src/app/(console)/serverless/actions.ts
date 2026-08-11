@@ -123,7 +123,7 @@ export async function rebuildFunctionAction(name: string): Promise<ActionError |
 
 /**
  * Pull the container's image tag again (POST .../pull, no body). 202 - one new
- * revision per site re-resolves the tag; a digest-pinned image returns the
+ * revision per region re-resolves the tag; a digest-pinned image returns the
  * API's own 400, surfaced inline.
  */
 export async function pullContainerAction(name: string): Promise<ActionError | void> {
