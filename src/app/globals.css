@@ -1060,10 +1060,23 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* The log pane reads as a console: dark in both themes, roomy, and quiet.
+   Fixed colors on purpose - a terminal does not follow the page theme. */
 .code-block--logs {
-  max-height: 420px;
+  max-height: min(65vh, 720px);
+  min-height: 260px;
   overflow-y: auto;
   white-space: pre-wrap;
+  background: #10151a;
+  color: #d7dee5;
+  border: 1px solid #262e36;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #3a444e transparent;
 }
 
 /* Forms */
@@ -1450,38 +1463,76 @@ code {
   width: auto;
   flex: 0 1 240px;
 }
-/* The pod picker gets the room: pod names are long and the interesting bit is the suffix. */
-.logs-toolbar__pod {
-  flex: 1 1 320px;
-  min-width: 220px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+/* The Logs tab's pod list: one row per pod, expanding into its log console. */
+.pod-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-
-/* Live-stream state indicator on the Metrics and Logs tabs. */
-.live-dot {
-  display: inline-flex;
+.pod-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.pod-row--open {
+  box-shadow: var(--shadow);
+}
+.pod-row__head {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.live-dot::before {
-  content: "";
+.pod-row__head:hover {
+  background: var(--surface-2);
+}
+.pod-row__chevron {
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: transform 0.15s ease;
+  flex: none;
+}
+.pod-row--open .pod-row__chevron {
+  transform: rotate(90deg);
+}
+.pod-row__dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--text-muted);
+  flex: none;
 }
-.live-dot--live {
-  color: var(--green-600);
-}
-.live-dot--live::before {
+.pod-row__dot--ready {
   background: var(--green-600);
 }
-.live-dot--polling::before {
+.pod-row__dot--waiting {
   background: var(--yellow-700);
+}
+.pod-row__name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pod-row__meta {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex: none;
+}
+.pod-row__body {
+  padding: 0 14px 14px;
 }
 
 /* Section heading with a status/indicator on the same row. */
@@ -1495,9 +1546,15 @@ code {
   margin-bottom: 0;
 }
 
-/* One followed log line: a muted time gutter, then the message as logged. */
-.log-line__time {
-  color: var(--text-muted);
+/* One followed log line, exactly as the workload wrote it. */
+.log-line {
+  display: block;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 -4px;
+}
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* Build/Pull maintenance action next to Edit/Delete on the detail header. */
