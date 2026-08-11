@@ -8,67 +8,44 @@ import {
   mintStreamUrlAction,
 } from "@/app/(console)/serverless/actions";
 import { openTicketedStream } from "@/lib/stream";
-import type { LogLine, PodInfo, PodRoster, WorkloadType } from "@/lib/serverless";
+import type { LogLine, PodRoster, WorkloadType } from "@/lib/serverless";
 
 /** Keep the last N lines so a chatty pod cannot grow the tab unbounded. */
 const MAX_LINES = 2000;
 
 /**
- * The Logs tab: pick a pod, follow its log.
+ * Panes open at once. Each open pane holds one SSE connection, next to the
+ * roster's own - and a browser caps HTTP/1.1 connections per origin at six,
+ * beyond which a new EventSource silently queues forever. Opening one more
+ * closes the oldest instead.
+ */
+const MAX_OPEN = 3;
+
+/**
+ * The Logs tab: the workload's pods as a live list, each row expanding into
+ * its own log console.
  *
- * The pod roster comes from `GET .../{name}/pods` - a stream, because Knative
+ * The list comes from `GET .../{name}/pods` - a stream, because Knative
  * replaces pods on every revision and removes them all on scale-to-zero, so a
- * roster fetched once quietly stops being true. Picking a pod opens
- * `GET .../{name}/logs/pods/{pod}` and appends `log` events as they arrive.
- * Both streams authenticate with server-minted tickets (see lib/stream.ts) and
- * fall back to the `?follow=false` snapshots via server actions when streaming
- * is unavailable.
- *
- * An `end` event is routine, not an error. At the stream's time limit the API
- * asks the client to reconnect, and this does; when the pod's log genuinely
- * ended (scale-down, new revision) the roster stream keeps running, so the
- * selection moves to the replacement pod on its next event.
+ * roster fetched once quietly stops being true. Rows appear and vanish as the
+ * roster changes; expanding a row opens `GET .../{name}/logs/pods/{pod}` for
+ * that pod alone, and collapsing it closes the stream. Everything
+ * authenticates with server-minted tickets (see lib/stream.ts) and falls back
+ * to `?follow=false` snapshot polling when a stream cannot be opened.
  */
 export default function PodLogsViewer({ type, name }: { type: WorkloadType; name: string }) {
   const [roster, setRoster] = useState<PodRoster | null>(null);
   const [rosterMode, setRosterMode] = useState<"connecting" | "live" | "polling">("connecting");
-  const [chosenPod, setChosenPod] = useState<string>("");
+  const [rosterError, setRosterError] = useState<string | null>(null);
   const [container, setContainer] = useState("user-container");
   const [containerDraft, setContainerDraft] = useState("user-container");
-
-  // Lines carry a monotonic id so React keys stay stable once the buffer
-  // starts sliding - keying by index would rewrite every row per event.
-  const [lines, setLines] = useState<{ id: number; line: LogLine }[]>([]);
-  const nextLineId = useRef(0);
-  const [logMode, setLogMode] = useState<"idle" | "connecting" | "live" | "polling" | "ended">(
-    "idle",
-  );
-  const [notice, setNotice] = useState<string | null>(null);
-  const [logError, setLogError] = useState<string | null>(null);
-  const [rosterError, setRosterError] = useState<string | null>(null);
-  // Bumped to reopen the follow of the same pod (the API ends every stream at
-  // its time limit and asks the client to reconnect).
-  const [reconnectNonce, setReconnectNonce] = useState(0);
-
-  // The pod actually followed is derived, not synced: the user's choice while
-  // the roster still lists it, else the roster's first pod. When a followed pod
-  // is replaced (new revision, scale-down) the selection moves to the
-  // replacement on the next roster event - the "pick the replacement" the API
-  // docs describe - with no effect writing state behind the user's back.
-  const podNames = roster?.pods.map((p) => p.pod) ?? [];
-  const pod = chosenPod && podNames.includes(chosenPod) ? chosenPod : (podNames[0] ?? "");
-
-  // Reset the log view when what it follows changes (render-phase, per React's
-  // "adjusting state when props change" pattern - not an effect).
-  const streamKey = `${pod}|${container}`;
-  const [prevStreamKey, setPrevStreamKey] = useState(streamKey);
-  if (streamKey !== prevStreamKey) {
-    setPrevStreamKey(streamKey);
-    setLines([]);
-    setNotice(null);
-    setLogError(null);
-    setLogMode(pod ? "connecting" : "idle");
-  }
+  // Expanded pod names, oldest first; rows for pods the roster dropped keep
+  // their entry so a pod that flaps does not lose its place, but render only
+  // while the roster lists them.
+  const [open, setOpen] = useState<string[]>([]);
+  // Auto-expand happens once, and never again after the user has touched a
+  // row - the view must not fight them.
+  const [touched, setTouched] = useState(false);
 
   /* ---- the pod roster ---- */
 
@@ -117,11 +94,141 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
     };
   }, [rosterMode, type, name]);
 
-  /* ---- one pod's log ---- */
+  // First roster with pods: expand the first row, so the common case - one
+  // pod, one log - shows lines without a click. Render-phase (per React's
+  // "adjusting state when props change" pattern), and only until the user
+  // touches a row.
+  const firstPod = roster?.pods[0]?.pod;
+  if (!touched && firstPod && open.length === 0) {
+    setTouched(true);
+    setOpen([firstPod]);
+  }
+
+  function toggle(pod: string) {
+    setTouched(true);
+    setOpen((prev) =>
+      prev.includes(pod) ? prev.filter((p) => p !== pod) : [...prev, pod].slice(-MAX_OPEN),
+    );
+  }
+
+  return (
+    <div className="stack">
+      <form
+        className="logs-toolbar"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setContainer(containerDraft.trim() || "user-container");
+        }}
+      >
+        <input
+          className="input"
+          value={containerDraft}
+          onChange={(e) => setContainerDraft(e.target.value)}
+          placeholder="user-container"
+          aria-label="Container"
+        />
+        <button type="submit" className="btn btn--sm">
+          Load
+        </button>
+      </form>
+
+      {roster && (
+        <p className="text-muted">
+          Pods on site <strong>{roster.site}</strong>. A scaled-to-zero workload has no pods; logs
+          reach back only as far as the node keeps them.
+        </p>
+      )}
+
+      {rosterError && (
+        <div className="notice notice--error">Could not read the pod roster: {rosterError}</div>
+      )}
+
+      {!roster ? (
+        <div className="notice">Waiting for the pod roster from the API…</div>
+      ) : roster.pods.length === 0 ? (
+        <div className="notice">No running pods to read logs from.</div>
+      ) : (
+        <div className="pod-list">
+          {roster.pods.map((p) => {
+            const expanded = open.includes(p.pod);
+            return (
+              <div key={p.pod} className={`pod-row${expanded ? " pod-row--open" : ""}`}>
+                <button
+                  type="button"
+                  className="pod-row__head"
+                  onClick={() => toggle(p.pod)}
+                  aria-expanded={expanded}
+                >
+                  <span className="pod-row__chevron" aria-hidden>
+                    ▸
+                  </span>
+                  <span
+                    className={`pod-row__dot pod-row__dot--${p.ready ? "ready" : "waiting"}`}
+                    title={p.ready ? "Ready" : `${p.phase}, not ready`}
+                  />
+                  <span className="pod-row__name">{p.pod}</span>
+                  <span className="pod-row__meta">
+                    {p.revision && <span>rev {p.revision}</span>}
+                    <span>{p.ready ? "Ready" : p.phase}</span>
+                    {p.restarts > 0 && <span>{p.restarts} restarts</span>}
+                    {p.usage?.cpu && <span>{p.usage.cpu} CPU</span>}
+                    {p.usage?.memory && <span>{p.usage.memory}</span>}
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="pod-row__body">
+                    <PodLogPane type={type} name={name} pod={p.pod} container={container} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One expanded pod's log console: opens the follow when mounted, closes it
+ * when collapsed/unmounted, and falls back to snapshot polling if the stream
+ * cannot be opened. Owns all of its own state, so panes never share fate.
+ */
+function PodLogPane({
+  type,
+  name,
+  pod,
+  container,
+}: {
+  type: WorkloadType;
+  name: string;
+  pod: string;
+  container: string;
+}) {
+  // Lines carry a monotonic id so React keys stay stable once the buffer
+  // starts sliding - keying by index would rewrite every row per event.
+  const [lines, setLines] = useState<{ id: number; line: LogLine }[]>([]);
+  const nextLineId = useRef(0);
+  const [mode, setMode] = useState<"connecting" | "live" | "polling" | "ended">("connecting");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Bumped to reopen the follow of the same pod (the API ends every stream at
+  // its time limit and asks the client to reconnect).
+  const [reconnectNonce, setReconnectNonce] = useState(0);
+
+  // Reset the pane when what it follows changes (render-phase, per React's
+  // "adjusting state when props change" pattern - not an effect).
+  const streamKey = `${pod}|${container}|${reconnectNonce}`;
+  const [prevStreamKey, setPrevStreamKey] = useState(streamKey);
+  if (streamKey !== prevStreamKey) {
+    setPrevStreamKey(streamKey);
+    setLines([]);
+    setNotice(null);
+    setError(null);
+    setMode("connecting");
+  }
 
   useEffect(() => {
-    if (!pod) return;
-
     let ended = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const stream = openTicketedStream({
@@ -138,7 +245,7 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
         return "url" in res ? res.url : null;
       },
       events: {
-        open: () => setLogMode("live"),
+        open: () => setMode("live"),
         log: (data) => {
           setLines((prev) => {
             const next = [...prev, { id: nextLineId.current++, line: data as LogLine }];
@@ -154,28 +261,26 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
           // things. At the stream's time limit the API says "…; reconnect",
           // and we do: the pod is still running and the follow should go on.
           // Otherwise the pod's log genuinely ended (scale-down or a new
-          // revision): stop, and let the roster stream move the selection to
-          // the replacement rather than chasing a pod that is gone.
+          // revision): stop, and let the roster remove the row - the
+          // replacement pod appears in the list on its next event.
           ended = true;
           stream.close();
           const reason = (data as { reason: string }).reason;
           if (/reconnect/i.test(reason)) {
-            setLogMode("connecting");
-            reconnectTimer = setTimeout(() => {
-              setLines([]);
-              setReconnectNonce((n) => n + 1);
-            }, 1000);
+            setMode("connecting");
+            // The nonce bump alone resets the pane (see streamKey above).
+            reconnectTimer = setTimeout(() => setReconnectNonce((n) => n + 1), 1000);
           } else {
-            setLogMode("ended");
+            setMode("ended");
             setNotice(reason);
           }
         },
         error: (data) => {
-          setLogError((data as { message?: string }).message ?? "The log stream failed.");
+          setError((data as { message?: string }).message ?? "The log stream failed.");
         },
       },
       onDown: () => {
-        if (!ended) setLogMode("polling");
+        if (!ended) setMode("polling");
       },
     });
     return () => {
@@ -184,21 +289,21 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
     };
   }, [type, name, pod, container, reconnectNonce]);
 
-  // Snapshot polling for the selected pod, only while its stream is down.
+  // Snapshot polling, only while this pane's stream is down.
   useEffect(() => {
-    if (logMode !== "polling" || !pod) return;
+    if (mode !== "polling") return;
     let stop = false;
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
       const res = await getPodLogsAction(type, name, pod, { container });
       if (stop) return;
       if ("snapshot" in res) {
-        setLogError(null);
+        setError(null);
         setLines(
           res.snapshot.lines.slice(-MAX_LINES).map((line) => ({ id: nextLineId.current++, line })),
         );
       } else {
-        setLogError(res.error);
+        setError(res.error);
       }
     };
     void tick();
@@ -207,7 +312,7 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
       stop = true;
       clearInterval(id);
     };
-  }, [logMode, type, name, pod, container]);
+  }, [mode, type, name, pod, container]);
 
   /* ---- auto-scroll: follow the tail unless the user scrolled up ---- */
 
@@ -218,94 +323,29 @@ export default function PodLogsViewer({ type, name }: { type: WorkloadType; name
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight;
   }, [lines]);
 
-  const selected: PodInfo | undefined = roster?.pods.find((p) => p.pod === pod);
-
   return (
     <div className="stack">
-      <form
-        className="logs-toolbar"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setContainer(containerDraft.trim() || "user-container");
+      {notice && <div className="notice">{notice}</div>}
+      {error && <div className="notice notice--error">{error}</div>}
+      <pre
+        ref={logRef}
+        className="code-block code-block--logs"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          pinnedRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 32;
         }}
       >
-        <select
-          className="input logs-toolbar__pod"
-          value={pod}
-          onChange={(e) => setChosenPod(e.target.value)}
-          aria-label="Pod"
-          disabled={!roster || roster.pods.length === 0}
-        >
-          {(!roster || roster.pods.length === 0) && <option value="">No running pods</option>}
-          {roster?.pods.map((p) => (
-            <option key={p.pod} value={p.pod}>
-              {p.pod}
-              {p.ready ? "" : ` (${p.phase}, not ready)`}
-            </option>
-          ))}
-        </select>
-        <input
-          className="input"
-          value={containerDraft}
-          onChange={(e) => setContainerDraft(e.target.value)}
-          placeholder="user-container"
-          aria-label="Container"
-        />
-        <button type="submit" className="btn btn--sm">
-          Load
-        </button>
-      </form>
-
-      {roster && (
-        <p className="text-muted">
-          Pods on site <strong>{roster.site}</strong>
-          {selected && (
-            <>
-              {" "}
-              · revision {selected.revision ?? "—"} · {selected.phase}
-              {selected.restarts > 0 && ` · ${selected.restarts} restarts`}
-              {selected.usage?.cpu && ` · ${selected.usage.cpu} CPU`}
-              {selected.usage?.memory && ` · ${selected.usage.memory} memory`}
-            </>
-          )}
-          . A scaled-to-zero workload has no pods; logs reach back only as far as the node keeps
-          them.
-        </p>
-      )}
-
-      {notice && <div className="notice">{notice}</div>}
-      {rosterError && (
-        <div className="notice notice--error">Could not read the pod roster: {rosterError}</div>
-      )}
-      {logError && <div className="notice notice--error">{logError}</div>}
-
-      {!pod ? (
-        <div className="notice">
-          {roster
-            ? "No running pods to read logs from."
-            : "Waiting for the pod roster from the API…"}
-        </div>
-      ) : (
-        <pre
-          ref={logRef}
-          className="code-block code-block--logs"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            pinnedRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 32;
-          }}
-        >
-          {lines.length === 0
-            ? logMode === "connecting"
-              ? "Waiting for log lines…"
-              : "(no log lines yet)"
-            : lines.map(({ id, line }) => (
-                <span key={id} className="log-line">
-                  {line.message}
-                  {"\n"}
-                </span>
-              ))}
-        </pre>
-      )}
+        {lines.length === 0
+          ? mode === "connecting"
+            ? "Waiting for log lines…"
+            : "(no log lines yet)"
+          : lines.map(({ id, line }) => (
+              <span key={id} className="log-line">
+                {line.message}
+                {"\n"}
+              </span>
+            ))}
+      </pre>
     </div>
   );
 }
