@@ -16,8 +16,8 @@ interface SideNavProps {
  * a flat, icon-led list). Enabled services link to their console page; not-yet-
  * available ones render disabled with a "Soon" tag.
  *
- * A service with sub-sections (e.g. Serverless -> Functions / Containers /
- * Groups) shows them as a collapsible group: a caret toggles the sub-list. By
+ * A service with sub-sections (e.g. Serverless -> Functions / Containers)
+ * shows them as a collapsible group: a caret toggles the sub-list. By
  * default the group is expanded while you are somewhere inside that service.
  */
 export default function SideNav({ services }: SideNavProps) {

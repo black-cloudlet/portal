@@ -67,7 +67,6 @@ function defaultCatalog(): ServiceDef[] {
       subItems: [
         { id: "functions", name: "Functions" },
         { id: "containers", name: "Containers" },
-        { id: "groups", name: "Groups" },
       ],
     },
     soon(

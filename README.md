@@ -46,7 +46,7 @@ trusts - so one login works across every offering, and group names are
   `/logs/pods/{pod}`). It auto-refreshes while a workload is still deploying.
 - **Live streams, the API's way.** The browser consumes the API's Server-Sent
   Events endpoints with the documented ticket flow: a server action spends the
-  user's SSO token on `POST /api/v1/stream-tickets` (EventSource cannot send an
+  user's SSO token on `POST /api/serverless/v1/stream-tickets` (EventSource cannot send an
   `Authorization` header) and hands the browser a short-lived, single-path
   `?ticket=` URL to open directly against the API. Tickets are re-minted on
   every reconnect. When streaming is unavailable - no ticket signing key

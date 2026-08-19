@@ -43,7 +43,9 @@ export default async function ContainersPage() {
     <div className="stack">
       <div className="viewhead">
         <h2 className="viewhead__title">Containers</h2>
-        <p className="viewhead__sub">Containers View</p>
+        <p className="viewhead__sub">
+          Deploy a prebuilt image from any registry, with autoscaling and scale to zero.
+        </p>
       </div>
       {fetchError ? (
         <ApiErrorNotice error={fetchError} />

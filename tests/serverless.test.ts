@@ -56,8 +56,8 @@ describe("getWorkloadStats", () => {
     await getWorkloadStats("container", "team", "orders-api", "tok");
 
     expect(calls.map((c) => c.url)).toEqual([
-      `${BASE}/api/v1/groups/team/functions/image-resizer/stats`,
-      `${BASE}/api/v1/groups/team/containers/orders-api/stats`,
+      `${BASE}/api/serverless/v1/groups/team/functions/image-resizer/stats`,
+      `${BASE}/api/serverless/v1/groups/team/containers/orders-api/stats`,
     ]);
   });
 
@@ -72,7 +72,9 @@ describe("getWorkloadStats", () => {
 
     await getWorkloadStats("function", "team space", "a/b", "tok");
 
-    expect(calls[0].url).toBe(`${BASE}/api/v1/groups/team%20space/functions/a%2Fb/stats`);
+    expect(calls[0].url).toBe(
+      `${BASE}/api/serverless/v1/groups/team%20space/functions/a%2Fb/stats`,
+    );
   });
 
   it("reads the totals and the per-region rows straight off the response", async () => {
@@ -111,7 +113,7 @@ describe("build and pull", () => {
 
     expect(calls).toEqual([
       {
-        url: `${BASE}/api/v1/groups/team/functions/image-resizer/build`,
+        url: `${BASE}/api/serverless/v1/groups/team/functions/image-resizer/build`,
         method: "POST",
         body: null,
       },
@@ -125,7 +127,7 @@ describe("build and pull", () => {
 
     expect(calls).toEqual([
       {
-        url: `${BASE}/api/v1/groups/team/containers/orders-api/pull`,
+        url: `${BASE}/api/serverless/v1/groups/team/containers/orders-api/pull`,
         method: "POST",
         body: null,
       },
@@ -135,7 +137,7 @@ describe("build and pull", () => {
 
 describe("workloadStreamPath", () => {
   it("builds the three ticketable stream paths, without query params", () => {
-    const base = "/api/v1/groups/team/functions/orders";
+    const base = "/api/serverless/v1/groups/team/functions/orders";
     expect(workloadStreamPath("function", "team", "orders", { kind: "pods" })).toBe(`${base}/pods`);
     expect(workloadStreamPath("function", "team", "orders", { kind: "stats" })).toBe(
       `${base}/stats/stream`,
@@ -153,7 +155,7 @@ describe("mintStreamTicket", () => {
 
     const minted = await mintStreamTicket(path, "tok");
 
-    expect(calls[0].url).toBe(`${BASE}/api/v1/stream-tickets`);
+    expect(calls[0].url).toBe(`${BASE}/api/serverless/v1/stream-tickets`);
     expect(calls[0].method).toBe("POST");
     expect(JSON.parse(calls[0].body ?? "")).toEqual({ path });
     expect(minted.ticket).toBe("t1");
@@ -172,7 +174,9 @@ describe("pods and pod-log snapshots", () => {
 
     await getPodsSnapshot("function", "team", "orders", "tok");
 
-    expect(calls[0].url).toBe(`${BASE}/api/v1/groups/team/functions/orders/pods?follow=false`);
+    expect(calls[0].url).toBe(
+      `${BASE}/api/serverless/v1/groups/team/functions/orders/pods?follow=false`,
+    );
   });
 
   it("asks the per-pod log endpoint for a snapshot, with the caller's options", async () => {
@@ -194,7 +198,7 @@ describe("pods and pod-log snapshots", () => {
     });
 
     expect(calls[0].url).toBe(
-      `${BASE}/api/v1/groups/team/functions/orders/logs/pods/orders-x2wql` +
+      `${BASE}/api/serverless/v1/groups/team/functions/orders/logs/pods/orders-x2wql` +
         `?follow=false&container=user-container&sinceSeconds=60&limitBytes=65536`,
     );
   });
