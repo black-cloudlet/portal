@@ -43,7 +43,9 @@ export default async function FunctionsPage() {
     <div className="stack">
       <div className="viewhead">
         <h2 className="viewhead__title">Functions</h2>
-        <p className="viewhead__sub">Functions View</p>
+        <p className="viewhead__sub">
+          Deploy code straight from a Git repository - the platform builds and runs it.
+        </p>
       </div>
       {fetchError ? (
         <ApiErrorNotice error={fetchError} />

@@ -5,8 +5,8 @@
  * actions) and forward the user's SSO access token as a Bearer, so the API
  * applies the exact same group-based authorization it would for any other OIDC
  * caller. The token never reaches the browser. The active group is a path
- * segment (`/api/v1/groups/{group}/...`) - identical to what the API normalizes
- * on its side.
+ * segment (`/api/serverless/v1/groups/{group}/...`) - identical to what the API
+ * normalizes on its side.
  *
  * The shapes below mirror the API's response/request models (see
  * api/models/common.py, function.py, container.py, info.py).
@@ -218,7 +218,7 @@ export interface PodLogSnapshot {
 }
 
 /**
- * A minted stream ticket (`POST /api/v1/stream-tickets`): the browser's
+ * A minted stream ticket (`POST .../stream-tickets`): the browser's
  * credential for one SSE path, sent as `?ticket=` since EventSource cannot
  * carry an Authorization header.
  */
@@ -321,13 +321,13 @@ export interface BasePlatformInfo {
   naming?: NamingRule;
 }
 
-/** Container capabilities (`GET /api/v1/containers/info`): the base plus the port rules. */
+/** Container capabilities (`GET .../containers/info`): the base plus the port rules. */
 export interface ContainerInfo extends BasePlatformInfo {
   port: PortCapability;
 }
 
 /**
- * Function capabilities (`GET /api/v1/functions/info`): the base plus the
+ * Function capabilities (`GET .../functions/info`): the base plus the
  * runtimes and the same port rules a container publishes.
  */
 export interface FunctionInfo extends BasePlatformInfo {
@@ -477,6 +477,14 @@ interface ErrorEnvelope {
   };
 }
 
+/**
+ * The complete path prefix the Serverless API serves its endpoints under
+ * (base path + version segment), matching the API's `api_base` - the chart
+ * ships `SERVERLESS_BASE_PATH=/api/serverless`, so every endpoint lives at
+ * `/api/serverless/v1/...`.
+ */
+const API_BASE = "/api/serverless/v1";
+
 function baseUrl(): string {
   const svc = getService("serverless");
   if (!svc?.apiBaseUrl) {
@@ -487,9 +495,9 @@ function baseUrl(): string {
   return svc.apiBaseUrl;
 }
 
-/** The collection path for a workload type, e.g. `/api/v1/groups/team/functions`. */
+/** The collection path for a workload type, e.g. `/api/serverless/v1/groups/team/functions`. */
 function collectionPath(type: WorkloadType, group: string): string {
-  return `/api/v1/groups/${encodeURIComponent(group)}/${type}s`;
+  return `${API_BASE}/groups/${encodeURIComponent(group)}/${type}s`;
 }
 
 async function apiGet<T>(path: string, accessToken: string | undefined): Promise<T> {
@@ -566,14 +574,14 @@ async function toApiError(resp: Response, path: string): Promise<ServerlessApiEr
   );
 }
 
-/** Public container capabilities (`GET /api/v1/containers/info`); no auth required. */
+/** Public container capabilities (`GET .../containers/info`); no auth required. */
 export function getContainerInfo(): Promise<ContainerInfo> {
-  return apiGet<ContainerInfo>("/api/v1/containers/info", undefined);
+  return apiGet<ContainerInfo>(`${API_BASE}/containers/info`, undefined);
 }
 
-/** Public function capabilities (`GET /api/v1/functions/info`); no auth required. */
+/** Public function capabilities (`GET .../functions/info`); no auth required. */
 export function getFunctionInfo(): Promise<FunctionInfo> {
-  return apiGet<FunctionInfo>("/api/v1/functions/info", undefined);
+  return apiGet<FunctionInfo>(`${API_BASE}/functions/info`, undefined);
 }
 
 /** Sort keys the list endpoints accept. */
@@ -677,7 +685,7 @@ export function workloadStreamPath(
 
 /**
  * Mint a short-lived ticket for one streaming path
- * (`POST /api/v1/stream-tickets`). The user's token is spent server-side, on a
+ * (`POST .../stream-tickets`). The user's token is spent server-side, on a
  * request that can carry it; only the ticket - one path, ~60s - reaches the
  * browser. A 503 means the deployment has no signing key, so streaming is off
  * for browsers and the caller should fall back to snapshot polling.
@@ -686,7 +694,7 @@ export function mintStreamTicket(
   path: string,
   accessToken: string | undefined,
 ): Promise<StreamTicket> {
-  return apiSend<StreamTicket>("POST", "/api/v1/stream-tickets", accessToken, {
+  return apiSend<StreamTicket>("POST", `${API_BASE}/stream-tickets`, accessToken, {
     path,
   }) as Promise<StreamTicket>;
 }

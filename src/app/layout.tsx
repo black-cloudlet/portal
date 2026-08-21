@@ -5,7 +5,12 @@ import { branding } from "@/lib/config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: branding.productName,
+  // Pages set short titles ("Functions"); the template keeps the product name
+  // in the tab so multiple console tabs stay tellable apart.
+  title: {
+    template: `%s · ${branding.productName}`,
+    default: branding.productName,
+  },
   description: `${branding.productName} - self-service console for the ${branding.organization} platform.`,
 };
 
