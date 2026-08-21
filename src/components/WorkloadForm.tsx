@@ -11,6 +11,7 @@ import {
 } from "@/app/(console)/serverless/actions";
 import { useCreationTracker } from "@/components/CreationTracker";
 import Icon from "@/components/Icon";
+import { contentByteSize, formatBytes } from "@/lib/file-download";
 import type {
   ContainerCreateInput,
   ContainerUpdateInput,
@@ -156,10 +157,17 @@ export default function WorkloadForm({
       secret: f.secret,
       readOnly: f.readOnly,
       existing: true,
+      // Stored content is kept in state (the API's full-replace needs it) but
+      // never rendered - the row shows a size summary instead.
+      source: "stored" as const,
     })) ?? [],
   );
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // The row a "Replace file" click targets; the shared hidden input below
+  // reads the picked file into that row.
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceIndexRef = useRef<number | null>(null);
 
   // Advanced: placement + scaling
   const [size, setSize] = useState(initial?.size ?? sizes[0]);
@@ -178,29 +186,43 @@ export default function WorkloadForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
 
+  /** Read one local file's content (the API deals in string content). */
+  function readFileText(file: File): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => resolve("");
+      reader.readAsText(file);
+    });
+  }
+
   /** Read picked/dropped local files into new file rows (mount path = /etc/<name>). */
   async function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const rows = await Promise.all(
       Array.from(list).map(
-        (file) =>
-          new Promise<FileRow>((resolve) => {
-            const reader = new FileReader();
-            const done = (content: string) =>
-              resolve({
-                mountPath: `/etc/${file.name}`,
-                content,
-                secret: false,
-                readOnly: true,
-                existing: false,
-              });
-            reader.onload = () => done(typeof reader.result === "string" ? reader.result : "");
-            reader.onerror = () => done("");
-            reader.readAsText(file);
-          }),
+        async (file): Promise<FileRow> => ({
+          mountPath: `/etc/${file.name}`,
+          content: await readFileText(file),
+          secret: false,
+          readOnly: true,
+          existing: false,
+          source: "upload",
+        }),
       ),
     );
     setFiles((p) => [...p, ...rows]);
+  }
+
+  /** Put a re-picked file's content into the row a "Replace file" click targeted. */
+  async function replaceFile(list: FileList | null) {
+    const i = replaceIndexRef.current;
+    replaceIndexRef.current = null;
+    if (i == null || !list || list.length === 0) return;
+    const content = await readFileText(list[0]);
+    setFiles((p) =>
+      p.map((r, j) => (j === i ? { ...r, content, source: "upload" as const } : r)),
+    );
   }
 
   function buildScaling(): ScalingInput {
@@ -793,7 +815,14 @@ export default function WorkloadForm({
               onClick={() =>
                 setFiles((p) => [
                   ...p,
-                  { mountPath: "", content: "", secret: false, readOnly: true, existing: false },
+                  {
+                    mountPath: "",
+                    content: "",
+                    secret: false,
+                    readOnly: true,
+                    existing: false,
+                    source: "text",
+                  },
                 ])
               }
             >
@@ -884,27 +913,61 @@ export default function WorkloadForm({
                       Remove
                     </button>
                   </div>
-                  <textarea
-                    className="input textarea"
-                    placeholder={
-                      row.secret && row.existing
-                        ? "blank keeps the stored content"
-                        : row.secret
-                          ? "secret file content"
-                          : "file content"
-                    }
-                    rows={3}
-                    value={row.content}
-                    onChange={(e) =>
-                      setFiles((p) =>
-                        p.map((r, j) => (j === i ? { ...r, content: e.target.value } : r)),
-                      )
-                    }
-                  />
+                  {/* Uploaded / stored content is never rendered (it may be large
+                      or non-text); those rows show a size summary with a replace
+                      action. Only hand-typed rows get an editable textarea. */}
+                  {row.source === "upload" || row.source === "stored" ? (
+                    <div className="file-editor__summary">
+                      <span className="text-muted">
+                        {row.source === "stored"
+                          ? row.secret
+                            ? "Stored secret content is kept."
+                            : `Stored content · ${formatBytes(contentByteSize(row.content))} — kept as is.`
+                          : `Uploaded · ${formatBytes(contentByteSize(row.content))}`}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn--outline btn--sm"
+                        onClick={() => {
+                          replaceIndexRef.current = i;
+                          replaceInputRef.current?.click();
+                        }}
+                      >
+                        Replace file
+                      </button>
+                    </div>
+                  ) : (
+                    <textarea
+                      className="input textarea"
+                      placeholder={
+                        row.secret && row.existing
+                          ? "blank keeps the stored content"
+                          : row.secret
+                            ? "secret file content"
+                            : "file content"
+                      }
+                      rows={3}
+                      value={row.content}
+                      onChange={(e) =>
+                        setFiles((p) =>
+                          p.map((r, j) => (j === i ? { ...r, content: e.target.value } : r)),
+                        )
+                      }
+                    />
+                  )}
                 </div>
               ))}
             </div>
           )}
+          <input
+            ref={replaceInputRef}
+            type="file"
+            hidden
+            onChange={(e) => {
+              void replaceFile(e.target.files);
+              e.target.value = "";
+            }}
+          />
         </section>
       </div>
 

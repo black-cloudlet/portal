@@ -1050,6 +1050,18 @@ code {
   display: flex;
   gap: 6px;
 }
+/* Size + download row; contents themselves are never rendered. */
+.file-card__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.file-card__body p {
+  margin: 0;
+}
 .code-block {
   margin: 0;
   padding: 14px;
@@ -1151,6 +1163,14 @@ code {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+/* Uploaded/stored file rows: a size summary + replace action, no content. */
+.file-editor__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
 }
 .form__actions {
   display: flex;

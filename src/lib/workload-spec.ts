@@ -35,6 +35,13 @@ export interface FileRow {
   readOnly: boolean;
   /** True when this file already exists on the workload (edit prefill). */
   existing: boolean;
+  /**
+   * Where the row's content came from. The form shows an editable textarea
+   * only for "text" (hand-typed) rows; "upload" and "stored" rows show a size
+   * summary instead, since their content may be large or non-text and is never
+   * rendered. Absent means "text" (and does not affect the built request).
+   */
+  source?: "text" | "upload" | "stored";
 }
 
 /**

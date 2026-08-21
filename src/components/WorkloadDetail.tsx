@@ -9,6 +9,7 @@ import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
+import { contentByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
@@ -339,7 +340,11 @@ function SecretsPanel({ wl }: { wl: WorkloadDetailData }) {
   );
 }
 
-/** Mounted files (secret and non-secret); secret contents are redacted. */
+/**
+ * Mounted files (secret and non-secret). Contents are never rendered - they
+ * may be large or non-text - so each card shows the size and a download link
+ * instead. Secret contents are redacted by the API and offer no download.
+ */
 function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
   if (wl.files.length === 0) return <div className="notice">No mounted files.</div>;
   return (
@@ -353,13 +358,24 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
               <span className="pill pill--muted">{f.readOnly ? "read-only" : "read-write"}</span>
             </span>
           </div>
-          {f.secret ? (
-            <p className="text-muted">Secret content is not shown.</p>
-          ) : f.content != null ? (
-            <pre className="code-block">{f.content}</pre>
-          ) : (
-            <p className="text-muted">No content.</p>
-          )}
+          <div className="file-card__body">
+            {f.secret ? (
+              <p className="text-muted">Secret content is not shown.</p>
+            ) : f.content != null ? (
+              <>
+                <span className="text-muted">{formatBytes(contentByteSize(f.content))}</span>
+                <a
+                  className="btn btn--outline btn--sm"
+                  href={fileDownloadPath(wl.type, wl.name, f.mountPath)}
+                  download
+                >
+                  Download
+                </a>
+              </>
+            ) : (
+              <p className="text-muted">No content.</p>
+            )}
+          </div>
         </div>
       ))}
     </div>
