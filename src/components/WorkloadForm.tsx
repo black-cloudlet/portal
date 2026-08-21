@@ -11,7 +11,7 @@ import {
 } from "@/app/(console)/serverless/actions";
 import { useCreationTracker } from "@/components/CreationTracker";
 import Icon from "@/components/Icon";
-import { contentByteSize, formatBytes } from "@/lib/file-download";
+import { base64ByteSize, bytesToBase64, contentByteSize, formatBytes } from "@/lib/file-download";
 import type {
   ContainerCreateInput,
   ContainerUpdateInput,
@@ -154,12 +154,17 @@ export default function WorkloadForm({
     initial?.files.map((f) => ({
       mountPath: f.mountPath,
       content: f.content ?? "",
+      encoding: "text" as const,
       secret: f.secret,
       readOnly: f.readOnly,
       existing: true,
       // Stored content is kept in state (the API's full-replace needs it) but
       // never rendered - the row shows a size summary instead.
       source: "stored" as const,
+      // A non-secret file whose content read back null is binary: the API
+      // returns no base64 form, and (unlike a secret) has no "keep" on update,
+      // so the row must be re-uploaded before saving (validated below).
+      unreadable: !f.secret && f.content == null,
     })) ?? [],
   );
   const [dragging, setDragging] = useState(false);
@@ -186,14 +191,17 @@ export default function WorkloadForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
 
-  /** Read one local file's content (the API deals in string content). */
-  function readFileText(file: File): Promise<string> {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => resolve("");
-      reader.readAsText(file);
-    });
+  /**
+   * Read one local file's raw bytes as base64. Uploads always go out as the
+   * API's `contentBase64` field (never `content`, which is UTF-8 text only),
+   * so binary files - keystores, certificates - survive byte-for-byte.
+   */
+  async function readFileBase64(file: File): Promise<string> {
+    try {
+      return bytesToBase64(new Uint8Array(await file.arrayBuffer()));
+    } catch {
+      return "";
+    }
   }
 
   /** Read picked/dropped local files into new file rows (mount path = /etc/<name>). */
@@ -203,7 +211,8 @@ export default function WorkloadForm({
       Array.from(list).map(
         async (file): Promise<FileRow> => ({
           mountPath: `/etc/${file.name}`,
-          content: await readFileText(file),
+          content: await readFileBase64(file),
+          encoding: "base64",
           secret: false,
           readOnly: true,
           existing: false,
@@ -219,10 +228,19 @@ export default function WorkloadForm({
     const i = replaceIndexRef.current;
     replaceIndexRef.current = null;
     if (i == null || !list || list.length === 0) return;
-    const content = await readFileText(list[0]);
+    const content = await readFileBase64(list[0]);
     setFiles((p) =>
-      p.map((r, j) => (j === i ? { ...r, content, source: "upload" as const } : r)),
+      p.map((r, j) =>
+        j === i
+          ? { ...r, content, encoding: "base64" as const, source: "upload" as const, unreadable: false }
+          : r,
+      ),
     );
+  }
+
+  /** A row's decoded size for the summaries, honoring its encoding. */
+  function rowByteSize(row: FileRow): number {
+    return row.encoding === "base64" ? base64ByteSize(row.content) : contentByteSize(row.content);
   }
 
   function buildScaling(): ScalingInput {
@@ -310,6 +328,14 @@ export default function WorkloadForm({
         !(isEdit && f.existing)
       )
         return { tab: "env", message: `Secret file "${f.mountPath}" needs content.` };
+      // A stored binary (non-secret) file cannot be read back from the API, and
+      // a full replace must carry the bytes - saving without re-uploading it
+      // would write an empty file over it.
+      if (f.mountPath.trim() !== "" && f.unreadable)
+        return {
+          tab: "env",
+          message: `File "${f.mountPath}" has binary stored content the API cannot return — upload the file again to keep it, or remove the row.`,
+        };
     }
     return null;
   }
@@ -922,8 +948,10 @@ export default function WorkloadForm({
                         {row.source === "stored"
                           ? row.secret
                             ? "Stored secret content is kept."
-                            : `Stored content · ${formatBytes(contentByteSize(row.content))} — kept as is.`
-                          : `Uploaded · ${formatBytes(contentByteSize(row.content))}`}
+                            : row.unreadable
+                              ? "Stored binary content can't be read back — upload the file again to keep it."
+                              : `Stored content · ${formatBytes(rowByteSize(row))} — kept as is.`
+                          : `Uploaded · ${formatBytes(rowByteSize(row))}`}
                       </span>
                       <button
                         type="button"

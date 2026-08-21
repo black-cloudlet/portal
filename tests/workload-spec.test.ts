@@ -77,4 +77,35 @@ describe("buildFileList", () => {
       ),
     ).toEqual([]);
   });
+
+  it("sends a base64 row as contentBase64 (and never content)", () => {
+    const [out] = buildFileList(
+      [
+        {
+          mountPath: "/b",
+          content: "3q2+7w==",
+          encoding: "base64",
+          secret: false,
+          readOnly: true,
+          existing: false,
+        },
+      ],
+      false,
+    );
+    expect(out).toEqual({ mountPath: "/b", secret: false, readOnly: true, contentBase64: "3q2+7w==" });
+    expect(out).not.toHaveProperty("content");
+  });
+
+  it("sends an entered secret base64 row as contentBase64", () => {
+    expect(buildFileList([{ ...secretKept, content: "eA==", encoding: "base64" }], true)).toEqual([
+      { mountPath: "/s", secret: true, readOnly: true, contentBase64: "eA==" },
+    ]);
+  });
+
+  it("still keeps a blank existing secret on edit when the row is base64", () => {
+    const [out] = buildFileList([{ ...secretKept, encoding: "base64" }], true);
+    expect(out).toEqual({ mountPath: "/s", secret: true, readOnly: true });
+    expect(out).not.toHaveProperty("content");
+    expect(out).not.toHaveProperty("contentBase64");
+  });
 });

@@ -373,7 +373,9 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
                 </a>
               </>
             ) : (
-              <p className="text-muted">No content.</p>
+              // A non-secret file reads back null only when its bytes are not
+              // UTF-8 - the API returns no base64 form, so no download either.
+              <p className="text-muted">Binary content — the API cannot return it for download.</p>
             )}
           </div>
         </div>

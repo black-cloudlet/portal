@@ -35,6 +35,26 @@ export function contentByteSize(content: string): number {
   return new TextEncoder().encode(content).length;
 }
 
+/**
+ * Base64-encode raw bytes (chunked so a large file does not blow the argument
+ * limit of `String.fromCharCode`). This is how an upload is sent to the API:
+ * `contentBase64` carries arbitrary bytes, where `content` is UTF-8 text only.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+/** Decoded byte size of a base64 blob (ignoring whitespace and padding). */
+export function base64ByteSize(b64: string): number {
+  const significant = b64.replace(/[^A-Za-z0-9+/]/g, "").length;
+  return Math.floor((significant * 3) / 4);
+}
+
 /** Human-readable size for the file summaries ("512 B", "3.4 KB", "1.2 MB"). */
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

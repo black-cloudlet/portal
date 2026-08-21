@@ -104,7 +104,12 @@ export interface EnvVarView {
   secret: boolean;
 }
 
-/** A mounted file read back from a workload; secret contents are redacted. */
+/**
+ * A mounted file read back from a workload; secret contents are redacted.
+ * `content` is text-only: a non-secret file whose stored bytes are not UTF-8
+ * (a keystore, a DER certificate) also reads back as null - the API returns
+ * no base64 form on reads, so binary content cannot be fetched back.
+ */
 export interface FileView {
   mountPath: string;
   readOnly: boolean;
@@ -367,9 +372,13 @@ export interface EnvVarInput {
 
 export interface FileInput {
   mountPath: string;
-  // Keep-on-write: a secret file sent with content null/omitted keeps the
-  // stored content on update. A non-secret file always needs content.
+  // Exactly one of content/contentBase64 carries the file (the API rejects
+  // both together): `content` is UTF-8 text, `contentBase64` is arbitrary
+  // bytes base64-encoded - the way a caller signals binary content.
+  // Keep-on-write: a secret file sent with both null/omitted keeps the
+  // stored content on update. A non-secret file always needs one of them.
   content?: string | null;
+  contentBase64?: string | null;
   secret: boolean;
   readOnly: boolean;
 }

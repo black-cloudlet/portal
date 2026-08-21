@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  base64ByteSize,
+  bytesToBase64,
   contentByteSize,
   downloadFilename,
   fileDownloadPath,
@@ -43,6 +45,31 @@ describe("contentByteSize", () => {
     expect(contentByteSize("abc")).toBe(3);
     expect(contentByteSize("é")).toBe(2); // UTF-8
     expect(contentByteSize("")).toBe(0);
+  });
+});
+
+describe("bytesToBase64", () => {
+  it("encodes arbitrary (non-UTF-8) bytes", () => {
+    expect(bytesToBase64(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("3q2+7w==");
+    expect(bytesToBase64(new Uint8Array([]))).toBe("");
+  });
+
+  it("round-trips content larger than one encoding chunk", () => {
+    const bytes = new Uint8Array(0x8000 + 17).map((_, i) => i % 251);
+    const decoded = Uint8Array.from(atob(bytesToBase64(bytes)), (c) => c.charCodeAt(0));
+    expect(decoded).toEqual(bytes);
+  });
+});
+
+describe("base64ByteSize", () => {
+  it("reports the decoded size, ignoring padding", () => {
+    expect(base64ByteSize("3q2+7w==")).toBe(4); // 4 bytes
+    expect(base64ByteSize("eA==")).toBe(1);
+    expect(base64ByteSize("")).toBe(0);
+  });
+
+  it("tolerates line-wrapped bodies (PEM-style)", () => {
+    expect(base64ByteSize("eHh4\neHh4\n")).toBe(6);
   });
 });
 
