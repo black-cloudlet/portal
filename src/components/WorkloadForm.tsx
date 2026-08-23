@@ -154,17 +154,14 @@ export default function WorkloadForm({
     initial?.files.map((f) => ({
       mountPath: f.mountPath,
       content: f.content ?? "",
-      encoding: "text" as const,
+      // Binary files read back base64-encoded with encoding "base64"; echoing
+      // the pair back is exactly what the API expects on the full-replace PUT.
+      encoding: f.encoding ?? ("text" as const),
       secret: f.secret,
-      readOnly: f.readOnly,
       existing: true,
       // Stored content is kept in state (the API's full-replace needs it) but
       // never rendered - the row shows a size summary instead.
       source: "stored" as const,
-      // A non-secret file whose content read back null is binary: the API
-      // returns no base64 form, and (unlike a secret) has no "keep" on update,
-      // so the row must be re-uploaded before saving (validated below).
-      unreadable: !f.secret && f.content == null,
     })) ?? [],
   );
   const [dragging, setDragging] = useState(false);
@@ -192,9 +189,9 @@ export default function WorkloadForm({
   const [error, setError] = useState<ActionError | null>(null);
 
   /**
-   * Read one local file's raw bytes as base64. Uploads always go out as the
-   * API's `contentBase64` field (never `content`, which is UTF-8 text only),
-   * so binary files - keystores, certificates - survive byte-for-byte.
+   * Read one local file's raw bytes as base64. Uploads always go out with
+   * `encoding: "base64"` (never as text, which is UTF-8 only), so binary
+   * files - keystores, certificates - survive byte-for-byte.
    */
   async function readFileBase64(file: File): Promise<string> {
     try {
@@ -214,7 +211,6 @@ export default function WorkloadForm({
           content: await readFileBase64(file),
           encoding: "base64",
           secret: false,
-          readOnly: true,
           existing: false,
           source: "upload",
         }),
@@ -231,9 +227,7 @@ export default function WorkloadForm({
     const content = await readFileBase64(list[0]);
     setFiles((p) =>
       p.map((r, j) =>
-        j === i
-          ? { ...r, content, encoding: "base64" as const, source: "upload" as const, unreadable: false }
-          : r,
+        j === i ? { ...r, content, encoding: "base64" as const, source: "upload" as const } : r,
       ),
     );
   }
@@ -328,14 +322,6 @@ export default function WorkloadForm({
         !(isEdit && f.existing)
       )
         return { tab: "env", message: `Secret file "${f.mountPath}" needs content.` };
-      // A stored binary (non-secret) file cannot be read back from the API, and
-      // a full replace must carry the bytes - saving without re-uploading it
-      // would write an empty file over it.
-      if (f.mountPath.trim() !== "" && f.unreadable)
-        return {
-          tab: "env",
-          message: `File "${f.mountPath}" has binary stored content the API cannot return — upload the file again to keep it, or remove the row.`,
-        };
     }
     return null;
   }
@@ -844,8 +830,8 @@ export default function WorkloadForm({
                   {
                     mountPath: "",
                     content: "",
+                    encoding: "text",
                     secret: false,
-                    readOnly: true,
                     existing: false,
                     source: "text",
                   },
@@ -919,18 +905,6 @@ export default function WorkloadForm({
                       />
                       secret
                     </label>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={row.readOnly}
-                        onChange={(e) =>
-                          setFiles((p) =>
-                            p.map((r, j) => (j === i ? { ...r, readOnly: e.target.checked } : r)),
-                          )
-                        }
-                      />
-                      read-only
-                    </label>
                     <button
                       type="button"
                       className="btn btn--sm"
@@ -948,9 +922,7 @@ export default function WorkloadForm({
                         {row.source === "stored"
                           ? row.secret
                             ? "Stored secret content is kept."
-                            : row.unreadable
-                              ? "Stored binary content can't be read back — upload the file again to keep it."
-                              : `Stored content · ${formatBytes(rowByteSize(row))} — kept as is.`
+                            : `Stored content · ${formatBytes(rowByteSize(row))} — kept as is.`
                           : `Uploaded · ${formatBytes(rowByteSize(row))}`}
                       </span>
                       <button

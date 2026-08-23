@@ -105,16 +105,24 @@ export interface EnvVarView {
 }
 
 /**
- * A mounted file read back from a workload; secret contents are redacted.
- * `content` is text-only: a non-secret file whose stored bytes are not UTF-8
- * (a keystore, a DER certificate) also reads back as null - the API returns
- * no base64 form on reads, so binary content cannot be fetched back.
+ * How a file's `content` string carries the file: "text" means the string is
+ * the file, "base64" means it is the file's raw bytes base64-encoded (for a
+ * keystore or a DER certificate, which have no text form). Mounted files are
+ * always read-only - Kubernetes mounts ConfigMap/Secret volumes read-only -
+ * so there is no readOnly field on either side.
+ */
+export type FileEncoding = "text" | "base64";
+
+/**
+ * A mounted file read back from a workload; secret contents are redacted
+ * (`content: null`). A non-secret binary file reads back base64-encoded with
+ * `encoding: "base64"`, so any read can be sent straight back on update.
  */
 export interface FileView {
   mountPath: string;
-  readOnly: boolean;
   secret: boolean;
   content: string | null;
+  encoding: FileEncoding;
 }
 
 /** Autoscaling settings (desired state). */
@@ -372,15 +380,13 @@ export interface EnvVarInput {
 
 export interface FileInput {
   mountPath: string;
-  // Exactly one of content/contentBase64 carries the file (the API rejects
-  // both together): `content` is UTF-8 text, `contentBase64` is arbitrary
-  // bytes base64-encoded - the way a caller signals binary content.
-  // Keep-on-write: a secret file sent with both null/omitted keeps the
-  // stored content on update. A non-secret file always needs one of them.
+  // `content` carries the file and `encoding` says how (text = the string is
+  // the file; base64 = raw bytes base64-encoded, for binary content).
+  // Keep-on-write: a secret file sent with content null/omitted keeps the
+  // stored content on update. A non-secret file always needs content.
   content?: string | null;
-  contentBase64?: string | null;
+  encoding?: FileEncoding;
   secret: boolean;
-  readOnly: boolean;
 }
 
 export interface FunctionCreateInput {

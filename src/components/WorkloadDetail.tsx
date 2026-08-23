@@ -9,7 +9,7 @@ import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
-import { contentByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
+import { base64ByteSize, contentByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
@@ -342,8 +342,10 @@ function SecretsPanel({ wl }: { wl: WorkloadDetailData }) {
 
 /**
  * Mounted files (secret and non-secret). Contents are never rendered - they
- * may be large or non-text - so each card shows the size and a download link
- * instead. Secret contents are redacted by the API and offer no download.
+ * may be large or binary (read back base64-encoded with encoding "base64") -
+ * so each card shows the size and a download link instead. Secret contents
+ * are redacted by the API and offer no download. Every mount is read-only by
+ * platform rule, so no per-file flag is shown.
  */
 function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
   if (wl.files.length === 0) return <div className="notice">No mounted files.</div>;
@@ -355,7 +357,9 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
             <code>{f.mountPath}</code>
             <span className="file-card__tags">
               {f.secret && <span className="pill pill--muted">secret</span>}
-              <span className="pill pill--muted">{f.readOnly ? "read-only" : "read-write"}</span>
+              {!f.secret && f.encoding === "base64" && (
+                <span className="pill pill--muted">binary</span>
+              )}
             </span>
           </div>
           <div className="file-card__body">
@@ -363,7 +367,13 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
               <p className="text-muted">Secret content is not shown.</p>
             ) : f.content != null ? (
               <>
-                <span className="text-muted">{formatBytes(contentByteSize(f.content))}</span>
+                <span className="text-muted">
+                  {formatBytes(
+                    f.encoding === "base64"
+                      ? base64ByteSize(f.content)
+                      : contentByteSize(f.content),
+                  )}
+                </span>
                 <a
                   className="btn btn--outline btn--sm"
                   href={fileDownloadPath(wl.type, wl.name, f.mountPath)}
@@ -373,9 +383,7 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
                 </a>
               </>
             ) : (
-              // A non-secret file reads back null only when its bytes are not
-              // UTF-8 - the API returns no base64 form, so no download either.
-              <p className="text-muted">Binary content — the API cannot return it for download.</p>
+              <p className="text-muted">No content.</p>
             )}
           </div>
         </div>

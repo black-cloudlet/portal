@@ -38,7 +38,8 @@ export function contentByteSize(content: string): number {
 /**
  * Base64-encode raw bytes (chunked so a large file does not blow the argument
  * limit of `String.fromCharCode`). This is how an upload is sent to the API:
- * `contentBase64` carries arbitrary bytes, where `content` is UTF-8 text only.
+ * content with `encoding: "base64"` carries arbitrary bytes, where a text
+ * content string is UTF-8 only.
  */
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";

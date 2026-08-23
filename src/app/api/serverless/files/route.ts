@@ -14,7 +14,7 @@
 
 import { NextResponse } from "next/server";
 
-import { contentByteSize, downloadFilename } from "@/lib/file-download";
+import { downloadFilename } from "@/lib/file-download";
 import { getWorkload, ServerlessApiError, type WorkloadType } from "@/lib/serverless";
 import { getServerlessContext } from "@/lib/serverless-context";
 
@@ -56,13 +56,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "file not found" }, { status: 404 });
   }
 
+  // The API returns the file as text, or base64-encoded with encoding
+  // "base64" when the bytes are not UTF-8 - decode so the download is the
+  // file's real bytes either way.
+  const bytes =
+    file.encoding === "base64"
+      ? Buffer.from(file.content, "base64")
+      : Buffer.from(file.content, "utf-8");
+
   const filename = downloadFilename(file.mountPath);
   // ASCII fallback plus the RFC 5987 UTF-8 form for non-ASCII names.
   const asciiName = filename.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
-  return new Response(file.content, {
+  return new Response(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/octet-stream",
-      "Content-Length": String(contentByteSize(file.content)),
+      "Content-Length": String(bytes.length),
       "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
       "Cache-Control": "no-store",
     },

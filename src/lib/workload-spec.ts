@@ -33,13 +33,13 @@ export interface FileRow {
   /** The file body: UTF-8 text, or a base64 blob when `encoding` is "base64". */
   content: string;
   /**
-   * How `content` is encoded, deciding which API field carries it: "text"
-   * (default) sends `content`, "base64" sends `contentBase64`. Uploads are
-   * always base64 so binary files survive; hand-typed rows are text.
+   * How `content` is encoded, sent alongside it as the API's `encoding` field:
+   * "text" (default) means the string is the file, "base64" means raw bytes
+   * base64-encoded. Uploads are always base64 so binary files survive;
+   * hand-typed rows are text; stored rows echo what the API returned.
    */
   encoding?: "text" | "base64";
   secret: boolean;
-  readOnly: boolean;
   /** True when this file already exists on the workload (edit prefill). */
   existing: boolean;
   /**
@@ -49,13 +49,6 @@ export interface FileRow {
    * rendered. Absent means "text" (and does not affect the built request).
    */
   source?: "text" | "upload" | "stored";
-  /**
-   * True for a stored non-secret file whose content the API could not return
-   * (binary reads back as null). The API has no "keep" for non-secret files -
-   * a full replace must carry the bytes - so the form requires re-uploading
-   * such a row before saving, instead of silently writing an empty file.
-   */
-  unreadable?: boolean;
 }
 
 /**
@@ -90,31 +83,27 @@ export function buildEnvList(
 /**
  * Turn the file rows into the API files list. Rows with a blank mountPath are
  * dropped. On edit, a blank existing secret file keeps its stored content
- * (both content fields omitted); otherwise the entered content is sent.
+ * (content omitted); otherwise the entered content is sent with the row's
+ * `encoding` ("base64" is how the API is told the string carries raw bytes).
  * Non-secret files always carry their content.
- *
- * The row's `encoding` picks the API field: "base64" rows go out as
- * `contentBase64` (arbitrary bytes - how the API is told the content may be
- * binary), text rows as `content`. The API accepts exactly one of the two.
  */
 export function buildFileList(files: FileRow[], isEdit: boolean): FileInput[] {
   const out: FileInput[] = [];
   for (const f of files) {
     const mp = f.mountPath.trim();
     if (mp === "") continue;
-    const base = { mountPath: mp, secret: f.secret, readOnly: f.readOnly };
-    const body: Pick<FileInput, "content" | "contentBase64"> =
-      f.encoding === "base64" ? { contentBase64: f.content } : { content: f.content };
+    const base = { mountPath: mp, secret: f.secret };
+    const encoding = f.encoding ?? "text";
     if (f.secret) {
       if (f.content.trim() !== "") {
-        out.push({ ...base, ...body }); // set / change
+        out.push({ ...base, content: f.content, encoding }); // set / change
       } else if (isEdit && f.existing) {
         out.push(base); // keep stored (content omitted)
       } else {
-        out.push({ ...base, content: "" }); // new secret file (form validates)
+        out.push({ ...base, content: "", encoding }); // new secret file (form validates)
       }
     } else {
-      out.push({ ...base, ...body }); // non-secret always carries content
+      out.push({ ...base, content: f.content, encoding }); // non-secret always carries content
     }
   }
   return out;
