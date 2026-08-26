@@ -9,6 +9,7 @@ import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
+import { fileByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
@@ -339,7 +340,13 @@ function SecretsPanel({ wl }: { wl: WorkloadDetailData }) {
   );
 }
 
-/** Mounted files (secret and non-secret); secret contents are redacted. */
+/**
+ * Mounted files (secret and non-secret). Contents are never rendered - they
+ * may be large or binary (read back base64-encoded with encoding "base64") -
+ * so each card shows the size and a download link instead. Secret contents
+ * are redacted by the API and offer no download. Every mount is read-only by
+ * platform rule, so no per-file flag is shown.
+ */
 function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
   if (wl.files.length === 0) return <div className="notice">No mounted files.</div>;
   return (
@@ -350,16 +357,31 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
             <code>{f.mountPath}</code>
             <span className="file-card__tags">
               {f.secret && <span className="pill pill--muted">secret</span>}
-              <span className="pill pill--muted">{f.readOnly ? "read-only" : "read-write"}</span>
+              {!f.secret && f.encoding === "base64" && (
+                <span className="pill pill--muted">binary</span>
+              )}
             </span>
           </div>
-          {f.secret ? (
-            <p className="text-muted">Secret content is not shown.</p>
-          ) : f.content != null ? (
-            <pre className="code-block">{f.content}</pre>
-          ) : (
-            <p className="text-muted">No content.</p>
-          )}
+          <div className="file-card__body">
+            {f.secret ? (
+              <p className="text-muted">Secret content is not shown.</p>
+            ) : f.content != null ? (
+              <>
+                <span className="text-muted">
+                  {formatBytes(fileByteSize(f.content, f.encoding))}
+                </span>
+                <a
+                  className="btn btn--outline btn--sm"
+                  href={fileDownloadPath(wl.type, wl.name, f.mountPath, wl.group)}
+                  download
+                >
+                  Download
+                </a>
+              </>
+            ) : (
+              <p className="text-muted">No content.</p>
+            )}
+          </div>
         </div>
       ))}
     </div>

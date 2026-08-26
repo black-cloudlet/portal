@@ -30,11 +30,32 @@ export interface SecretRow {
 /** A mounted-file row from the Files tab. */
 export interface FileRow {
   mountPath: string;
+  /** The file body: UTF-8 text, or a base64 blob when `encoding` is "base64". */
   content: string;
+  /**
+   * How `content` is encoded, sent alongside it as the API's `encoding` field:
+   * "text" means the string is the file, "base64" means raw bytes
+   * base64-encoded. Uploads are always base64 so binary files survive;
+   * hand-typed rows are text; stored rows echo what the API returned.
+   * Required so no consumer has to remember an "absent means text" rule.
+   */
+  encoding: "text" | "base64";
   secret: boolean;
-  readOnly: boolean;
   /** True when this file already exists on the workload (edit prefill). */
   existing: boolean;
+  /**
+   * Where the row's content came from. The form shows an editable textarea
+   * only for "text" (hand-typed) rows; "upload" and "stored" rows show a size
+   * summary instead, since their content may be large or non-text and is never
+   * rendered. Absent means "text" (and does not affect the built request).
+   */
+  source?: "text" | "upload" | "stored";
+  /**
+   * Decoded byte size, computed once when the row is created or its file is
+   * replaced (upload/stored rows only - the ones whose summary shows a size).
+   * Cached so rendering never re-scans a multi-MB content string.
+   */
+  byteSize?: number;
 }
 
 /**
@@ -68,26 +89,29 @@ export function buildEnvList(
 
 /**
  * Turn the file rows into the API files list. Rows with a blank mountPath are
- * dropped. On edit, a blank existing secret file keeps its stored content (the
- * content field is omitted); otherwise the entered content is sent. Non-secret
- * files always carry their content.
+ * dropped. On edit, a blank existing secret file keeps its stored content
+ * (content omitted); otherwise the entered content is sent with the row's
+ * `encoding` ("base64" is how the API is told the string carries raw bytes).
+ * Non-secret files always carry their content.
  */
 export function buildFileList(files: FileRow[], isEdit: boolean): FileInput[] {
   const out: FileInput[] = [];
   for (const f of files) {
     const mp = f.mountPath.trim();
     if (mp === "") continue;
-    const base = { mountPath: mp, secret: f.secret, readOnly: f.readOnly };
+    const base = { mountPath: mp, secret: f.secret };
     if (f.secret) {
       if (f.content.trim() !== "") {
-        out.push({ ...base, content: f.content }); // set / change
+        out.push({ ...base, content: f.content, encoding: f.encoding }); // set / change
       } else if (isEdit && f.existing) {
         out.push(base); // keep stored (content omitted)
       } else {
-        out.push({ ...base, content: "" }); // new secret file (form validates)
+        // new secret file (form validates)
+        out.push({ ...base, content: "", encoding: f.encoding });
       }
     } else {
-      out.push({ ...base, content: f.content }); // non-secret always carries content
+      // non-secret always carries content
+      out.push({ ...base, content: f.content, encoding: f.encoding });
     }
   }
   return out;

@@ -22,7 +22,7 @@ import {
   getWorkloadStats,
   mintStreamTicket,
   pullContainer,
-  ServerlessApiError,
+  serverlessErrorBody,
   streamBaseUrl,
   typeSegment,
   updateWorkload,
@@ -36,7 +36,7 @@ import {
   type WorkloadStats,
   type WorkloadType,
 } from "@/lib/serverless";
-import { getServerlessContext } from "@/lib/serverless-context";
+import { requireServerlessContext } from "@/lib/serverless-context";
 
 export interface ActionError {
   error: string;
@@ -45,24 +45,15 @@ export interface ActionError {
 }
 
 function toActionError(err: unknown): ActionError {
-  if (err instanceof ServerlessApiError) {
-    return { error: err.message, code: err.code, requestId: err.requestId };
-  }
-  return { error: (err as Error).message };
+  return serverlessErrorBody(err);
 }
 
 /** Resolve the request's active group + token, or an error to return to the form. */
 async function requireContext(): Promise<
   { group: string; accessToken?: string } | { fail: ActionError }
 > {
-  const { enabled, activeGroup, accessToken } = await getServerlessContext();
-  if (!enabled) {
-    return { fail: { error: "The Serverless API is not configured." } };
-  }
-  if (!activeGroup) {
-    return { fail: { error: "You have no active group to deploy into." } };
-  }
-  return { group: activeGroup, accessToken };
+  const ctx = await requireServerlessContext();
+  return "fail" in ctx ? { fail: { error: ctx.fail.error } } : ctx;
 }
 
 export async function createWorkloadAction(

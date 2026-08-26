@@ -1050,6 +1050,27 @@ code {
   display: flex;
   gap: 6px;
 }
+/* The size-summary + action rows (detail file card, form file editor);
+   contents themselves are never rendered. One shared ruleset so the two stay
+   visually identical. */
+.file-card__body,
+.file-editor__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.file-card__body {
+  padding: 10px 14px;
+}
+.file-card__body p {
+  margin: 0;
+}
+.file-editor__actions {
+  display: flex;
+  gap: 8px;
+}
 .code-block {
   margin: 0;
   padding: 14px;

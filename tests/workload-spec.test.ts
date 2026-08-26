@@ -40,41 +40,77 @@ describe("buildEnvList", () => {
 });
 
 describe("buildFileList", () => {
-  const secretKept = { mountPath: "/s", content: "", secret: true, readOnly: true, existing: true };
+  const secretKept = {
+    mountPath: "/s",
+    content: "",
+    encoding: "text" as const,
+    secret: true,
+    existing: true,
+  };
 
-  it("carries content for non-secret files", () => {
+  it("carries content (with text encoding) for non-secret files", () => {
     expect(
       buildFileList(
-        [{ mountPath: "/c", content: "hi", secret: false, readOnly: true, existing: false }],
+        [{ mountPath: "/c", content: "hi", encoding: "text", secret: false, existing: false }],
         false,
       ),
-    ).toEqual([{ mountPath: "/c", secret: false, readOnly: true, content: "hi" }]);
+    ).toEqual([{ mountPath: "/c", secret: false, content: "hi", encoding: "text" }]);
   });
 
-  it("omits the content field to keep a blank existing secret file on edit", () => {
+  it("omits content to keep a blank existing secret file on edit", () => {
     const [out] = buildFileList([secretKept], true);
-    expect(out).toEqual({ mountPath: "/s", secret: true, readOnly: true });
+    expect(out).toEqual({ mountPath: "/s", secret: true });
     expect(out).not.toHaveProperty("content");
   });
 
   it("sends content when a secret file's content is entered", () => {
     expect(buildFileList([{ ...secretKept, content: "new" }], true)).toEqual([
-      { mountPath: "/s", secret: true, readOnly: true, content: "new" },
+      { mountPath: "/s", secret: true, content: "new", encoding: "text" },
     ]);
   });
 
   it("sends empty content for a brand-new secret file (form validates)", () => {
     expect(buildFileList([{ ...secretKept, existing: false }], true)).toEqual([
-      { mountPath: "/s", secret: true, readOnly: true, content: "" },
+      { mountPath: "/s", secret: true, content: "", encoding: "text" },
     ]);
   });
 
   it("drops rows with a blank mount path", () => {
     expect(
       buildFileList(
-        [{ mountPath: "  ", content: "x", secret: false, readOnly: true, existing: false }],
+        [{ mountPath: "  ", content: "x", encoding: "text", secret: false, existing: false }],
         false,
       ),
     ).toEqual([]);
+  });
+
+  it("sends a base64 row with encoding base64 (how binary is signalled)", () => {
+    expect(
+      buildFileList(
+        [
+          {
+            mountPath: "/b",
+            content: "3q2+7w==",
+            encoding: "base64",
+            secret: false,
+            existing: false,
+          },
+        ],
+        false,
+      ),
+    ).toEqual([{ mountPath: "/b", secret: false, content: "3q2+7w==", encoding: "base64" }]);
+  });
+
+  it("sends an entered secret base64 row with encoding base64", () => {
+    expect(buildFileList([{ ...secretKept, content: "eA==", encoding: "base64" }], true)).toEqual([
+      { mountPath: "/s", secret: true, content: "eA==", encoding: "base64" },
+    ]);
+  });
+
+  it("still keeps a blank existing secret on edit when the row is base64", () => {
+    const [out] = buildFileList([{ ...secretKept, encoding: "base64" }], true);
+    expect(out).toEqual({ mountPath: "/s", secret: true });
+    expect(out).not.toHaveProperty("content");
+    expect(out).not.toHaveProperty("encoding");
   });
 });
