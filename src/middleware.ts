@@ -25,7 +25,9 @@ export default auth((req) => {
 
   if ((!req.auth || needsReauth) && !isPublic) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    // Keep the query string: routes like the file download are addressed by
+    // their params, and a post-login return to the bare path would 400.
+    loginUrl.searchParams.set("callbackUrl", pathname + req.nextUrl.search);
     return Response.redirect(loginUrl);
   }
 });

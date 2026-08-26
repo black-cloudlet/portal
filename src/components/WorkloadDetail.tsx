@@ -9,7 +9,7 @@ import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill, { ReasonChip } from "@/components/StatusPill";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
-import { base64ByteSize, contentByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
+import { fileByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
 import { isNotFound, withinCreateGrace } from "@/lib/pending-create";
 import {
   getWorkload,
@@ -368,15 +368,11 @@ function FilesPanel({ wl }: { wl: WorkloadDetailData }) {
             ) : f.content != null ? (
               <>
                 <span className="text-muted">
-                  {formatBytes(
-                    f.encoding === "base64"
-                      ? base64ByteSize(f.content)
-                      : contentByteSize(f.content),
-                  )}
+                  {formatBytes(fileByteSize(f.content, f.encoding))}
                 </span>
                 <a
                   className="btn btn--outline btn--sm"
-                  href={fileDownloadPath(wl.type, wl.name, f.mountPath)}
+                  href={fileDownloadPath(wl.type, wl.name, f.mountPath, wl.group)}
                   download
                 >
                   Download

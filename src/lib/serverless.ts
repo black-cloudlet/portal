@@ -478,6 +478,23 @@ export class ServerlessApiError extends Error {
 }
 
 /**
+ * One ServerlessApiError (or unknown failure) as the plain payload the console
+ * surfaces - message, machine code, and the requestId to quote to support.
+ * Shared by the server actions and the file-download route so the two never
+ * drift in what they expose.
+ */
+export function serverlessErrorBody(err: unknown): {
+  error: string;
+  code?: string;
+  requestId?: string;
+} {
+  if (err instanceof ServerlessApiError) {
+    return { error: err.message, code: err.code, requestId: err.requestId };
+  }
+  return { error: (err as Error).message };
+}
+
+/**
  * The Serverless API's standard error envelope (see common/errors.py). Every
  * failed call returns this shape, so the console surfaces the real reason a
  * workload call failed - and the requestId to trace it - not a bare status.

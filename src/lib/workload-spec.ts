@@ -34,11 +34,12 @@ export interface FileRow {
   content: string;
   /**
    * How `content` is encoded, sent alongside it as the API's `encoding` field:
-   * "text" (default) means the string is the file, "base64" means raw bytes
+   * "text" means the string is the file, "base64" means raw bytes
    * base64-encoded. Uploads are always base64 so binary files survive;
    * hand-typed rows are text; stored rows echo what the API returned.
+   * Required so no consumer has to remember an "absent means text" rule.
    */
-  encoding?: "text" | "base64";
+  encoding: "text" | "base64";
   secret: boolean;
   /** True when this file already exists on the workload (edit prefill). */
   existing: boolean;
@@ -49,6 +50,12 @@ export interface FileRow {
    * rendered. Absent means "text" (and does not affect the built request).
    */
   source?: "text" | "upload" | "stored";
+  /**
+   * Decoded byte size, computed once when the row is created or its file is
+   * replaced (upload/stored rows only - the ones whose summary shows a size).
+   * Cached so rendering never re-scans a multi-MB content string.
+   */
+  byteSize?: number;
 }
 
 /**
@@ -93,17 +100,18 @@ export function buildFileList(files: FileRow[], isEdit: boolean): FileInput[] {
     const mp = f.mountPath.trim();
     if (mp === "") continue;
     const base = { mountPath: mp, secret: f.secret };
-    const encoding = f.encoding ?? "text";
     if (f.secret) {
       if (f.content.trim() !== "") {
-        out.push({ ...base, content: f.content, encoding }); // set / change
+        out.push({ ...base, content: f.content, encoding: f.encoding }); // set / change
       } else if (isEdit && f.existing) {
         out.push(base); // keep stored (content omitted)
       } else {
-        out.push({ ...base, content: "", encoding }); // new secret file (form validates)
+        // new secret file (form validates)
+        out.push({ ...base, content: "", encoding: f.encoding });
       }
     } else {
-      out.push({ ...base, content: f.content, encoding }); // non-secret always carries content
+      // non-secret always carries content
+      out.push({ ...base, content: f.content, encoding: f.encoding });
     }
   }
   return out;

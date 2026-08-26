@@ -40,11 +40,20 @@ describe("buildEnvList", () => {
 });
 
 describe("buildFileList", () => {
-  const secretKept = { mountPath: "/s", content: "", secret: true, existing: true };
+  const secretKept = {
+    mountPath: "/s",
+    content: "",
+    encoding: "text" as const,
+    secret: true,
+    existing: true,
+  };
 
   it("carries content (with text encoding) for non-secret files", () => {
     expect(
-      buildFileList([{ mountPath: "/c", content: "hi", secret: false, existing: false }], false),
+      buildFileList(
+        [{ mountPath: "/c", content: "hi", encoding: "text", secret: false, existing: false }],
+        false,
+      ),
     ).toEqual([{ mountPath: "/c", secret: false, content: "hi", encoding: "text" }]);
   });
 
@@ -68,14 +77,25 @@ describe("buildFileList", () => {
 
   it("drops rows with a blank mount path", () => {
     expect(
-      buildFileList([{ mountPath: "  ", content: "x", secret: false, existing: false }], false),
+      buildFileList(
+        [{ mountPath: "  ", content: "x", encoding: "text", secret: false, existing: false }],
+        false,
+      ),
     ).toEqual([]);
   });
 
   it("sends a base64 row with encoding base64 (how binary is signalled)", () => {
     expect(
       buildFileList(
-        [{ mountPath: "/b", content: "3q2+7w==", encoding: "base64", secret: false, existing: false }],
+        [
+          {
+            mountPath: "/b",
+            content: "3q2+7w==",
+            encoding: "base64",
+            secret: false,
+            existing: false,
+          },
+        ],
         false,
       ),
     ).toEqual([{ mountPath: "/b", secret: false, content: "3q2+7w==", encoding: "base64" }]);

@@ -11,7 +11,7 @@ import {
 } from "@/app/(console)/serverless/actions";
 import { useCreationTracker } from "@/components/CreationTracker";
 import Icon from "@/components/Icon";
-import { base64ByteSize, bytesToBase64, contentByteSize, formatBytes } from "@/lib/file-download";
+import { bytesToBase64, fileByteSize, formatBytes } from "@/lib/file-download";
 import type {
   ContainerCreateInput,
   ContainerUpdateInput,
@@ -150,26 +150,30 @@ export default function WorkloadForm({
       .filter((e) => e.secret)
       .map((e) => ({ name: e.name, value: "", existing: true })) ?? [],
   );
+  // Lazy initializer: the mapping (with its per-file size scan) runs once,
+  // not on every render.
   const [files, setFiles] = useState<FileRow[]>(
-    initial?.files.map((f) => ({
-      mountPath: f.mountPath,
-      content: f.content ?? "",
-      // Binary files read back base64-encoded with encoding "base64"; echoing
-      // the pair back is exactly what the API expects on the full-replace PUT.
-      encoding: f.encoding ?? ("text" as const),
-      secret: f.secret,
-      existing: true,
-      // Stored content is kept in state (the API's full-replace needs it) but
-      // never rendered - the row shows a size summary instead.
-      source: "stored" as const,
-    })) ?? [],
+    () =>
+      initial?.files.map((f) => {
+        const content = f.content ?? "";
+        // Binary files read back base64-encoded with encoding "base64"; echoing
+        // the pair back is exactly what the API expects on the full-replace PUT.
+        const encoding = f.encoding ?? "text";
+        return {
+          mountPath: f.mountPath,
+          content,
+          encoding,
+          secret: f.secret,
+          existing: true,
+          // Stored content is kept in state (the API's full-replace needs it)
+          // but never rendered - the row shows a size summary instead.
+          source: "stored" as const,
+          byteSize: fileByteSize(content, encoding),
+        };
+      }) ?? [],
   );
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // The row a "Replace file" click targets; the shared hidden input below
-  // reads the picked file into that row.
-  const replaceInputRef = useRef<HTMLInputElement>(null);
-  const replaceIndexRef = useRef<number | null>(null);
 
   // Advanced: placement + scaling
   const [size, setSize] = useState(initial?.size ?? sizes[0]);
@@ -189,52 +193,79 @@ export default function WorkloadForm({
   const [error, setError] = useState<ActionError | null>(null);
 
   /**
-   * Read one local file's raw bytes as base64. Uploads always go out with
+   * Read one local file's raw bytes as base64, or null when the read fails
+   * (file moved/locked since it was picked) - callers surface the failure
+   * instead of silently committing an empty file. Uploads always go out with
    * `encoding: "base64"` (never as text, which is UTF-8 only), so binary
    * files - keystores, certificates - survive byte-for-byte.
    */
-  async function readFileBase64(file: File): Promise<string> {
+  async function readFileBase64(file: File): Promise<string | null> {
     try {
       return bytesToBase64(new Uint8Array(await file.arrayBuffer()));
     } catch {
-      return "";
+      return null;
     }
   }
 
   /** Read picked/dropped local files into new file rows (mount path = /etc/<name>). */
   async function addFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
-    const rows = await Promise.all(
-      Array.from(list).map(
-        async (file): Promise<FileRow> => ({
-          mountPath: `/etc/${file.name}`,
-          content: await readFileBase64(file),
-          encoding: "base64",
-          secret: false,
-          existing: false,
-          source: "upload",
-        }),
-      ),
-    );
-    setFiles((p) => [...p, ...rows]);
+    const failed: string[] = [];
+    const rows: FileRow[] = [];
+    for (const file of Array.from(list)) {
+      const content = await readFileBase64(file);
+      if (content == null) {
+        failed.push(file.name);
+        continue;
+      }
+      rows.push({
+        mountPath: `/etc/${file.name}`,
+        content,
+        encoding: "base64",
+        secret: false,
+        existing: false,
+        source: "upload",
+        byteSize: file.size,
+      });
+    }
+    if (rows.length > 0) setFiles((p) => [...p, ...rows]);
+    if (failed.length > 0) {
+      setError({ error: `Could not read ${failed.join(", ")} — the file(s) were not added.` });
+    }
   }
 
-  /** Put a re-picked file's content into the row a "Replace file" click targeted. */
-  async function replaceFile(list: FileList | null) {
-    const i = replaceIndexRef.current;
-    replaceIndexRef.current = null;
-    if (i == null || !list || list.length === 0) return;
-    const content = await readFileBase64(list[0]);
+  /**
+   * Put a re-picked file's content into `row`. The row is matched by identity,
+   * not index, so a list that changed while the file dialog or read was in
+   * flight can never route the bytes into a different row (a removed row makes
+   * the pick a no-op). On a failed read the row is left untouched.
+   */
+  async function replaceRowFile(row: FileRow, list: FileList | null) {
+    if (!list || list.length === 0) return;
+    const file = list[0];
+    const content = await readFileBase64(file);
+    if (content == null) {
+      setError({ error: `Could not read ${file.name} — the row keeps its current content.` });
+      return;
+    }
     setFiles((p) =>
-      p.map((r, j) =>
-        j === i ? { ...r, content, encoding: "base64" as const, source: "upload" as const } : r,
+      p.map((r) =>
+        r === row
+          ? {
+              ...r,
+              content,
+              encoding: "base64" as const,
+              source: "upload" as const,
+              byteSize: file.size,
+            }
+          : r,
       ),
     );
   }
 
-  /** A row's decoded size for the summaries, honoring its encoding. */
+  /** A row's decoded size for the summaries (cached at creation/replace time). */
   function rowByteSize(row: FileRow): number {
-    return row.encoding === "base64" ? base64ByteSize(row.content) : contentByteSize(row.content);
+    return row.byteSize ?? fileByteSize(row.content, row.encoding);
   }
 
   function buildScaling(): ScalingInput {
@@ -893,10 +924,21 @@ export default function WorkloadForm({
                         )
                       }
                     />
-                    <label className="check">
+                    <label
+                      className="check"
+                      title={
+                        row.existing
+                          ? "Secrecy can't change on an existing file — remove the row and add it again."
+                          : undefined
+                      }
+                    >
                       <input
                         type="checkbox"
                         checked={row.secret}
+                        // Locked on existing rows: a stored secret's content is
+                        // redacted, so making it non-secret would save an empty
+                        // file over the stored one.
+                        disabled={row.existing}
                         onChange={(e) =>
                           setFiles((p) =>
                             p.map((r, j) => (j === i ? { ...r, secret: e.target.checked } : r)),
@@ -925,16 +967,45 @@ export default function WorkloadForm({
                             : `Stored content · ${formatBytes(rowByteSize(row))} — kept as is.`
                           : `Uploaded · ${formatBytes(rowByteSize(row))}`}
                       </span>
-                      <button
-                        type="button"
-                        className="btn btn--outline btn--sm"
-                        onClick={() => {
-                          replaceIndexRef.current = i;
-                          replaceInputRef.current?.click();
-                        }}
-                      >
-                        Replace file
-                      </button>
+                      <span className="file-editor__actions">
+                        {/* Rotate a stored secret by typing: switches the row to
+                            a text editor (blank still keeps the stored value). */}
+                        {row.secret && row.source === "stored" && (
+                          <button
+                            type="button"
+                            className="btn btn--outline btn--sm"
+                            onClick={() =>
+                              setFiles((p) =>
+                                p.map((r) =>
+                                  r === row
+                                    ? {
+                                        ...r,
+                                        content: "",
+                                        encoding: "text" as const,
+                                        source: "text" as const,
+                                      }
+                                    : r,
+                                ),
+                              )
+                            }
+                          >
+                            Enter new value
+                          </button>
+                        )}
+                        {/* A label-wrapped input opens the picker with no refs;
+                            the handler closes over this row's identity. */}
+                        <label className="btn btn--outline btn--sm">
+                          Replace file
+                          <input
+                            type="file"
+                            hidden
+                            onChange={(e) => {
+                              void replaceRowFile(row, e.target.files);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </span>
                     </div>
                   ) : (
                     <textarea
@@ -959,15 +1030,6 @@ export default function WorkloadForm({
               ))}
             </div>
           )}
-          <input
-            ref={replaceInputRef}
-            type="file"
-            hidden
-            onChange={(e) => {
-              void replaceFile(e.target.files);
-              e.target.value = "";
-            }}
-          />
         </section>
       </div>
 
