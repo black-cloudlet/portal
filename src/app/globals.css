@@ -1117,6 +1117,19 @@ code {
   font-size: 12px;
   color: var(--text-muted);
 }
+/* The "?" beside a field label; its explanation is the hover tooltip. */
+.field__help {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 5px;
+  color: var(--text-muted);
+  cursor: help;
+}
+.field__help:focus-visible {
+  outline: 1px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
 .field-row {
   display: flex;
   gap: 16px;
@@ -1318,9 +1331,6 @@ code {
 }
 .field--full {
   grid-column: 1 / -1;
-}
-.field--hint-only {
-  gap: 0;
 }
 @media (max-width: 560px) {
   .form-grid {

@@ -72,6 +72,19 @@ function parseDelay(v: string | null | undefined): { value: string; unit: string
 }
 
 /**
+ * A small "?" beside a field label; the explanation is its hover tooltip.
+ * Focusable so keyboard users reach it, and aria-label carries the same text
+ * so a screen reader is not left with an icon.
+ */
+function FieldHelp({ text }: { text: string }) {
+  return (
+    <span className="field__help" title={text} aria-label={text} tabIndex={0}>
+      <Icon name="help" size={13} />
+    </span>
+  );
+}
+
+/**
  * Create or edit a function/container. The form mirrors the platform's create
  * flow: a "before you begin" banner, then three tabs — General (identity +
  * source + placement), Variables & Secrets (env vars, secret env vars, and
@@ -500,16 +513,16 @@ export default function WorkloadForm({
         <div className="form-grid">
           {mode === "create" && (
             <label className="field">
-              <span className="field__label">Name*</span>
-              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-              <span className="field__hint">
-                Lowercase DNS-1123 label.{" "}
-                {hostPreview && (
-                  <>
-                    Host: <code>{hostPreview}</code>
-                  </>
-                )}
+              <span className="field__label">
+                Name*
+                <FieldHelp text="Lowercase letters, digits and '-' (a DNS-1123 label)." />
               </span>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+              {hostPreview && (
+                <span className="field__hint">
+                  Host: <code>{hostPreview}</code>
+                </span>
+              )}
             </label>
           )}
 
@@ -533,16 +546,16 @@ export default function WorkloadForm({
                 />
               </label>
               <label className="field field--full">
-                <span className="field__label">Path</span>
+                <span className="field__label">
+                  Path
+                  <FieldHelp text="Sub-directory in the repo to build from. Leave blank for the root." />
+                </span>
                 <input
                   className="input"
                   value={path}
                   onChange={(e) => setPath(e.target.value)}
                   placeholder="repository root"
                 />
-                <span className="field__hint">
-                  Sub-directory in the repo to build from. Leave blank for the root.
-                </span>
               </label>
               <label className="field">
                 <span className="field__label">Runtime</span>
@@ -602,7 +615,16 @@ export default function WorkloadForm({
                 <input className="input" value={image} onChange={(e) => setImage(e.target.value)} />
               </label>
               <label className="field">
-                <span className="field__label">Registry username</span>
+                <span className="field__label">
+                  Registry username
+                  <FieldHelp
+                    text={
+                      isEdit
+                        ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
+                        : "Provide username and token together for a private image, or leave both blank for a public one."
+                    }
+                  />
+                </span>
                 <input
                   className="input"
                   value={registryUsername}
@@ -623,19 +645,17 @@ export default function WorkloadForm({
                   autoComplete="off"
                 />
               </label>
-              <div className="field field--full field--hint-only">
-                <span className="field__hint">
-                  {isEdit
-                    ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
-                    : "Provide username and token together for a private image, or leave both blank for a public one."}
-                </span>
-              </div>
             </>
           )}
 
           {/* Port: the same field for both offerings, since both take one. */}
           <label className="field">
-            <span className="field__label">Port</span>
+            <span className="field__label">
+              Port
+              <FieldHelp
+                text={`The port your ${typeLabel.toLowerCase()} listens on (${portRules.min}–${portRules.max}). Keep ${portRules.default} unless the ${isFn ? "app" : "image"} serves on another one.`}
+              />
+            </span>
             <div className="port-field">
               <span className="port-field__icon" aria-hidden="true">
                 <Icon name="plug" size={15} />
@@ -661,10 +681,6 @@ export default function WorkloadForm({
                 </button>
               )}
             </div>
-            <span className="field__hint">
-              The port your {typeLabel.toLowerCase()} listens on ({portRules.min}–{portRules.max}).
-              Keep {portRules.default} unless the {isFn ? "app" : "image"} serves on another one.
-            </span>
           </label>
 
           <label className="field">
@@ -678,14 +694,16 @@ export default function WorkloadForm({
             </select>
           </label>
           <label className="field">
-            <span className="field__label">Hostname (optional)</span>
+            <span className="field__label">
+              Hostname (optional)
+              <FieldHelp text="Leave blank to use the generated host." />
+            </span>
             <input
               className="input"
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
               placeholder={generatedHost}
             />
-            <span className="field__hint">Leave blank to use the generated host.</span>
           </label>
         </div>
       </div>
@@ -749,7 +767,15 @@ export default function WorkloadForm({
         {/* Secrets (secret env) */}
         <section className="form-section">
           <div className="form-section__head">
-            <h3 className="section-title">Secrets</h3>
+            <h3 className="section-title">
+              Secrets{" "}
+              <span
+                className="section-title__info"
+                title={`Stored in a Kubernetes Secret and never shown after saving.${isEdit ? " Leave a value blank to keep the stored secret." : ""}`}
+              >
+                <Icon name="help" size={14} />
+              </span>
+            </h3>
             <button
               type="button"
               className="btn btn--outline btn--sm"
@@ -758,10 +784,6 @@ export default function WorkloadForm({
               Add Secret
             </button>
           </div>
-          <p className="field__hint">
-            Stored in a Kubernetes Secret and never shown after saving.
-            {isEdit && " Leave a value blank to keep the stored secret."}
-          </p>
           {secrets.length === 0 ? (
             <div className="empty-state">
               <Icon name="code" size={28} />
@@ -812,7 +834,7 @@ export default function WorkloadForm({
             <h3 className="section-title">
               Files{" "}
               <span className="section-title__info" title="Mounted into the workload filesystem.">
-                <Icon name="info" size={14} />
+                <Icon name="help" size={14} />
               </span>
             </h3>
             <button
@@ -1007,7 +1029,7 @@ export default function WorkloadForm({
               min={0}
               value={delayValue}
               onChange={(e) => setDelayValue(e.target.value)}
-              placeholder="10"
+              placeholder={parseDelay(info.scaling.scaleDownDelay.default).value || undefined}
             />
           </label>
           <label className="field">
@@ -1047,7 +1069,10 @@ export default function WorkloadForm({
           </label>
 
           <label className="field">
-            <span className="field__label">Scaling Metric*</span>
+            <span className="field__label">
+              Scaling Metric*
+              <FieldHelp text="cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1)." />
+            </span>
             <select className="input" value={metric} onChange={(e) => setMetric(e.target.value)}>
               {metrics.map((m) => (
                 <option key={m} value={m}>
@@ -1064,13 +1089,12 @@ export default function WorkloadForm({
               min={1}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              placeholder="100"
+              placeholder={String(
+                info.scaling.metrics.find((m) => m.name === metric)?.target.default ?? "",
+              )}
             />
           </label>
         </div>
-        <p className="field__hint">
-          cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1).
-        </p>
         <p className="field__hint">
           Want to know more about Scaling your {typeLabel.toLowerCase()}?{" "}
           <a href="/docs" target="_blank" rel="noreferrer">
