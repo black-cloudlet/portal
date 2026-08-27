@@ -550,12 +550,7 @@ export default function WorkloadForm({
                   Path
                   <FieldHelp text="Sub-directory in the repo to build from. Leave blank for the root." />
                 </span>
-                <input
-                  className="input"
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                  placeholder="repository root"
-                />
+                <input className="input" value={path} onChange={(e) => setPath(e.target.value)} />
               </label>
               <label className="field">
                 <span className="field__label">Runtime</span>
