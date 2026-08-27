@@ -56,16 +56,6 @@ const FORM_TABS = [
 ] as const;
 type FormTab = (typeof FORM_TABS)[number]["id"];
 
-/**
- * The platform's cap on a workload name. Mirrors the API's per-field request
- * schema (maxLength on /openapi.json): names are capped so that {name}-{group}
- * always fits the 63-character DNS label, with per-field rather than combined
- * enforcement. The API remains the authority; this only pre-empts a round trip.
- */
-const NAME_MAX_LENGTH = 39;
-/** DNS-1123 label - the shape of a workload name. */
-const DNS1123_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
-
 /** Time-unit choices for the scale-down delay (value + Go-duration suffix). */
 const TIME_UNITS = [
   { id: "s", label: "seconds" },
@@ -285,26 +275,11 @@ export default function WorkloadForm({
       return { tab: "general", message: "Name is required." };
     if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
       return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
-    // Per-field limits, matching the API's request schema (/openapi.json): a
-    // name is a DNS-1123 label of at most NAME_MAX_LENGTH characters. The old
-    // combined {name}-{group} <= 63 rule is now impossible to violate under the
-    // per-field caps, so it is no longer pre-checked here. The group is never
-    // length-checked client-side: its cap applies to the *normalized* form, and
-    // a raw value (e.g. with a "/ggd-1234-" prefix) may legitimately be longer.
-    if (mode === "create" && name.trim() !== "") {
-      const n = name.trim();
-      if (n.length > NAME_MAX_LENGTH)
-        return {
-          tab: "general",
-          message: `Name too long: ${n.length} characters (max ${NAME_MAX_LENGTH}).`,
-        };
-      if (!DNS1123_LABEL.test(n))
-        return {
-          tab: "general",
-          message:
-            "Name must be lowercase letters, digits and '-', starting and ending alphanumeric.",
-        };
-    }
+    // No shape or length checks on the name: the API is the authority on its
+    // own rules (pattern and length on /openapi.json, the combined
+    // {name}-{group} cap on /info) and rejects with a precise message the form
+    // surfaces as-is. Only what the API cannot know is checked client-side -
+    // the reserved route segments above and the required fields below.
     if (isFn) {
       // PUT is a full replace, so the build inputs are required on edit as well
       // as create. The git token is redacted keep-on-omit (stored server-side),
@@ -526,13 +501,7 @@ export default function WorkloadForm({
           {mode === "create" && (
             <label className="field">
               <span className="field__label">Name*</span>
-              <input
-                className="input"
-                value={name}
-                maxLength={NAME_MAX_LENGTH}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`${typeLabel.toLowerCase()} name`}
-              />
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
               <span className="field__hint">
                 Lowercase DNS-1123 label.{" "}
                 {hostPreview && (
@@ -621,7 +590,7 @@ export default function WorkloadForm({
                   type="password"
                   value={gitToken}
                   onChange={(e) => setGitToken(e.target.value)}
-                  placeholder={isEdit ? "leave blank to keep the stored token" : "Token"}
+                  placeholder={isEdit ? "leave blank to keep the stored token" : undefined}
                   autoComplete="off"
                 />
               </label>
@@ -630,12 +599,7 @@ export default function WorkloadForm({
             <>
               <label className="field">
                 <span className="field__label">Registry path*</span>
-                <input
-                  className="input"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="Registry path"
-                />
+                <input className="input" value={image} onChange={(e) => setImage(e.target.value)} />
               </label>
               <label className="field">
                 <span className="field__label">Registry username</span>
@@ -643,7 +607,6 @@ export default function WorkloadForm({
                   className="input"
                   value={registryUsername}
                   onChange={(e) => setRegistryUsername(e.target.value)}
-                  placeholder="Username"
                   autoComplete="off"
                 />
               </label>
@@ -656,7 +619,7 @@ export default function WorkloadForm({
                   type="password"
                   value={registryToken}
                   onChange={(e) => setRegistryToken(e.target.value)}
-                  placeholder={isEdit ? "leave blank to keep" : "Token"}
+                  placeholder={isEdit ? "leave blank to keep" : undefined}
                   autoComplete="off"
                 />
               </label>
