@@ -56,16 +56,6 @@ const FORM_TABS = [
 ] as const;
 type FormTab = (typeof FORM_TABS)[number]["id"];
 
-/**
- * The platform's cap on a workload name. Mirrors the API's per-field request
- * schema (maxLength on /openapi.json): names are capped so that {name}-{group}
- * always fits the 63-character DNS label, with per-field rather than combined
- * enforcement. The API remains the authority; this only pre-empts a round trip.
- */
-const NAME_MAX_LENGTH = 39;
-/** DNS-1123 label - the shape of a workload name. */
-const DNS1123_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
-
 /** Time-unit choices for the scale-down delay (value + Go-duration suffix). */
 const TIME_UNITS = [
   { id: "s", label: "seconds" },
@@ -79,6 +69,19 @@ function parseDelay(v: string | null | undefined): { value: string; unit: string
   const m = /^(\d+)\s*(s|m|h)?$/.exec(v.trim());
   if (m) return { value: m[1], unit: m[2] ?? "s" };
   return { value: v.trim(), unit: "s" };
+}
+
+/**
+ * A small "?" beside a field label; the explanation is its hover tooltip.
+ * Focusable so keyboard users reach it, and aria-label carries the same text
+ * so a screen reader is not left with an icon.
+ */
+function FieldHelp({ text }: { text: string }) {
+  return (
+    <span className="field__help" title={text} aria-label={text} tabIndex={0}>
+      <Icon name="help" size={13} />
+    </span>
+  );
 }
 
 /**
@@ -285,26 +288,11 @@ export default function WorkloadForm({
       return { tab: "general", message: "Name is required." };
     if (mode === "create" && RESERVED_WORKLOAD_NAMES.includes(name.trim()))
       return { tab: "general", message: `"${name.trim()}" is a reserved name; choose another.` };
-    // Per-field limits, matching the API's request schema (/openapi.json): a
-    // name is a DNS-1123 label of at most NAME_MAX_LENGTH characters. The old
-    // combined {name}-{group} <= 63 rule is now impossible to violate under the
-    // per-field caps, so it is no longer pre-checked here. The group is never
-    // length-checked client-side: its cap applies to the *normalized* form, and
-    // a raw value (e.g. with a "/ggd-1234-" prefix) may legitimately be longer.
-    if (mode === "create" && name.trim() !== "") {
-      const n = name.trim();
-      if (n.length > NAME_MAX_LENGTH)
-        return {
-          tab: "general",
-          message: `Name too long: ${n.length} characters (max ${NAME_MAX_LENGTH}).`,
-        };
-      if (!DNS1123_LABEL.test(n))
-        return {
-          tab: "general",
-          message:
-            "Name must be lowercase letters, digits and '-', starting and ending alphanumeric.",
-        };
-    }
+    // No shape or length checks on the name: the API is the authority on its
+    // own rules (pattern and length on /openapi.json, the combined
+    // {name}-{group} cap on /info) and rejects with a precise message the form
+    // surfaces as-is. Only what the API cannot know is checked client-side -
+    // the reserved route segments above and the required fields below.
     if (isFn) {
       // PUT is a full replace, so the build inputs are required on edit as well
       // as create. The git token is redacted keep-on-omit (stored server-side),
@@ -525,22 +513,16 @@ export default function WorkloadForm({
         <div className="form-grid">
           {mode === "create" && (
             <label className="field">
-              <span className="field__label">Name*</span>
-              <input
-                className="input"
-                value={name}
-                maxLength={NAME_MAX_LENGTH}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`${typeLabel.toLowerCase()} name`}
-              />
-              <span className="field__hint">
-                Lowercase DNS-1123 label.{" "}
-                {hostPreview && (
-                  <>
-                    Host: <code>{hostPreview}</code>
-                  </>
-                )}
+              <span className="field__label">
+                Name*
+                <FieldHelp text="Lowercase letters, digits and '-' (a DNS-1123 label)." />
               </span>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+              {hostPreview && (
+                <span className="field__hint">
+                  Host: <code>{hostPreview}</code>
+                </span>
+              )}
             </label>
           )}
 
@@ -564,16 +546,11 @@ export default function WorkloadForm({
                 />
               </label>
               <label className="field field--full">
-                <span className="field__label">Path</span>
-                <input
-                  className="input"
-                  value={path}
-                  onChange={(e) => setPath(e.target.value)}
-                  placeholder="repository root"
-                />
-                <span className="field__hint">
-                  Sub-directory in the repo to build from. Leave blank for the root.
+                <span className="field__label">
+                  Path
+                  <FieldHelp text="Sub-directory in the repo to build from. Leave blank for the root." />
                 </span>
+                <input className="input" value={path} onChange={(e) => setPath(e.target.value)} />
               </label>
               <label className="field">
                 <span className="field__label">Runtime</span>
@@ -621,7 +598,7 @@ export default function WorkloadForm({
                   type="password"
                   value={gitToken}
                   onChange={(e) => setGitToken(e.target.value)}
-                  placeholder={isEdit ? "leave blank to keep the stored token" : "Token"}
+                  placeholder={isEdit ? "leave blank to keep the stored token" : undefined}
                   autoComplete="off"
                 />
               </label>
@@ -630,20 +607,23 @@ export default function WorkloadForm({
             <>
               <label className="field">
                 <span className="field__label">Registry path*</span>
-                <input
-                  className="input"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="Registry path"
-                />
+                <input className="input" value={image} onChange={(e) => setImage(e.target.value)} />
               </label>
               <label className="field">
-                <span className="field__label">Registry username</span>
+                <span className="field__label">
+                  Registry username
+                  <FieldHelp
+                    text={
+                      isEdit
+                        ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
+                        : "Provide username and token together for a private image, or leave both blank for a public one."
+                    }
+                  />
+                </span>
                 <input
                   className="input"
                   value={registryUsername}
                   onChange={(e) => setRegistryUsername(e.target.value)}
-                  placeholder="Username"
                   autoComplete="off"
                 />
               </label>
@@ -656,23 +636,21 @@ export default function WorkloadForm({
                   type="password"
                   value={registryToken}
                   onChange={(e) => setRegistryToken(e.target.value)}
-                  placeholder={isEdit ? "leave blank to keep" : "Token"}
+                  placeholder={isEdit ? "leave blank to keep" : undefined}
                   autoComplete="off"
                 />
               </label>
-              <div className="field field--full field--hint-only">
-                <span className="field__hint">
-                  {isEdit
-                    ? "Username + token rotates the pull secret; username alone keeps it; clearing both removes it."
-                    : "Provide username and token together for a private image, or leave both blank for a public one."}
-                </span>
-              </div>
             </>
           )}
 
           {/* Port: the same field for both offerings, since both take one. */}
           <label className="field">
-            <span className="field__label">Port</span>
+            <span className="field__label">
+              Port
+              <FieldHelp
+                text={`The port your ${typeLabel.toLowerCase()} listens on (${portRules.min}–${portRules.max}). Keep ${portRules.default} unless the ${isFn ? "app" : "image"} serves on another one.`}
+              />
+            </span>
             <div className="port-field">
               <span className="port-field__icon" aria-hidden="true">
                 <Icon name="plug" size={15} />
@@ -698,10 +676,6 @@ export default function WorkloadForm({
                 </button>
               )}
             </div>
-            <span className="field__hint">
-              The port your {typeLabel.toLowerCase()} listens on ({portRules.min}–{portRules.max}).
-              Keep {portRules.default} unless the {isFn ? "app" : "image"} serves on another one.
-            </span>
           </label>
 
           <label className="field">
@@ -715,14 +689,16 @@ export default function WorkloadForm({
             </select>
           </label>
           <label className="field">
-            <span className="field__label">Hostname (optional)</span>
+            <span className="field__label">
+              Hostname (optional)
+              <FieldHelp text="Leave blank to use the generated host." />
+            </span>
             <input
               className="input"
               value={hostname}
               onChange={(e) => setHostname(e.target.value)}
               placeholder={generatedHost}
             />
-            <span className="field__hint">Leave blank to use the generated host.</span>
           </label>
         </div>
       </div>
@@ -786,7 +762,15 @@ export default function WorkloadForm({
         {/* Secrets (secret env) */}
         <section className="form-section">
           <div className="form-section__head">
-            <h3 className="section-title">Secrets</h3>
+            <h3 className="section-title">
+              Secrets{" "}
+              <span
+                className="section-title__info"
+                title={`Stored in a Kubernetes Secret and never shown after saving.${isEdit ? " Leave a value blank to keep the stored secret." : ""}`}
+              >
+                <Icon name="help" size={14} />
+              </span>
+            </h3>
             <button
               type="button"
               className="btn btn--outline btn--sm"
@@ -795,10 +779,6 @@ export default function WorkloadForm({
               Add Secret
             </button>
           </div>
-          <p className="field__hint">
-            Stored in a Kubernetes Secret and never shown after saving.
-            {isEdit && " Leave a value blank to keep the stored secret."}
-          </p>
           {secrets.length === 0 ? (
             <div className="empty-state">
               <Icon name="code" size={28} />
@@ -849,7 +829,7 @@ export default function WorkloadForm({
             <h3 className="section-title">
               Files{" "}
               <span className="section-title__info" title="Mounted into the workload filesystem.">
-                <Icon name="info" size={14} />
+                <Icon name="help" size={14} />
               </span>
             </h3>
             <button
@@ -1044,7 +1024,7 @@ export default function WorkloadForm({
               min={0}
               value={delayValue}
               onChange={(e) => setDelayValue(e.target.value)}
-              placeholder="10"
+              placeholder={parseDelay(info.scaling.scaleDownDelay.default).value || undefined}
             />
           </label>
           <label className="field">
@@ -1084,7 +1064,10 @@ export default function WorkloadForm({
           </label>
 
           <label className="field">
-            <span className="field__label">Scaling Metric*</span>
+            <span className="field__label">
+              Scaling Metric*
+              <FieldHelp text="cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1)." />
+            </span>
             <select className="input" value={metric} onChange={(e) => setMetric(e.target.value)}>
               {metrics.map((m) => (
                 <option key={m} value={m}>
@@ -1101,13 +1084,12 @@ export default function WorkloadForm({
               min={1}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              placeholder="100"
+              placeholder={String(
+                info.scaling.metrics.find((m) => m.name === metric)?.target.default ?? "",
+              )}
             />
           </label>
         </div>
-        <p className="field__hint">
-          cpu/memory metrics use the HPA autoscaler and cannot scale to zero (min replicas ≥ 1).
-        </p>
         <p className="field__hint">
           Want to know more about Scaling your {typeLabel.toLowerCase()}?{" "}
           <a href="/docs" target="_blank" rel="noreferrer">
