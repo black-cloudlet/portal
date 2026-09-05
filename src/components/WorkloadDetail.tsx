@@ -7,6 +7,7 @@ import Icon from "@/components/Icon";
 import LiveStats from "@/components/LiveStats";
 import PodLogsViewer from "@/components/PodLogsViewer";
 import StatusPill, { ReasonChip } from "@/components/StatusPill";
+import WebhookPanel from "@/components/WebhookPanel";
 import WorkloadDetailTabs, { type DetailTab } from "@/components/WorkloadDetailTabs";
 import WorkloadOpButton from "@/components/WorkloadOpButton";
 import { fileByteSize, fileDownloadPath, formatBytes } from "@/lib/file-download";
@@ -207,9 +208,21 @@ function StatusPanel({ wl }: { wl: WorkloadDetailData }) {
                 <dd>{wl.gitRepo ?? "—"}</dd>
               </div>
               <div>
-                <dt>Branch</dt>
-                <dd>{wl.branch ?? "—"}</dd>
+                {/* "Git revision" spells out which revision: the table below
+                    lists the Knative revision each region is serving. */}
+                <dt>Git revision</dt>
+                <dd>{wl.revision ?? "—"}</dd>
               </div>
+              {wl.commit && (
+                <div>
+                  <dt>Pinned commit</dt>
+                  <dd
+                    title={`A git push pinned this commit; Build returns the function to ${wl.revision ?? "its revision"}.`}
+                  >
+                    <code>{wl.commit.slice(0, 12)}</code>
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>Path</dt>
                 <dd>{wl.path ? <code>{wl.path}</code> : "root"}</dd>
@@ -422,6 +435,10 @@ function AdvancedPanel({ wl }: { wl: WorkloadDetailData }) {
           <div className="notice">No scaling configuration.</div>
         )}
       </section>
+
+      {/* Only functions are built from source, so only they have a git hook.
+          `webhook` is absent on a container, and on an API that predates it. */}
+      {wl.type === "function" && wl.webhook && <WebhookPanel name={wl.name} initial={wl.webhook} />}
     </div>
   );
 }

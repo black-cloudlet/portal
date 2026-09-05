@@ -56,7 +56,7 @@ export default function WorkloadOpButton({ type, name }: { type: WorkloadType; n
         disabled={pending}
         title={
           type === "function"
-            ? "Build the current source again (same spec, fresh base image and dependencies)."
+            ? "Build the current source again (same spec, fresh base image and dependencies), returning the function to its revision's head."
             : "Re-resolve the image tag: cut a new revision that pulls what the tag points at now."
         }
       >

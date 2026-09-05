@@ -7,6 +7,7 @@ import {
   getWorkloadStats,
   mintStreamTicket,
   pullContainer,
+  rotateFunctionWebhook,
   workloadStreamPath,
 } from "../src/lib/serverless";
 
@@ -132,6 +133,40 @@ describe("build and pull", () => {
         body: null,
       },
     ]);
+  });
+});
+
+describe("rotateFunctionWebhook", () => {
+  it("POSTs the rotate endpoint with no body and returns the new token", async () => {
+    const calls = stubFetch({
+      url: `${BASE}/api/serverless/v1/groups/team/functions/image-resizer/build`,
+      token: "new-token",
+      provider: "gitlab",
+      events: ["push"],
+    });
+
+    const hook = await rotateFunctionWebhook("team", "image-resizer", "tok");
+
+    expect(calls).toEqual([
+      {
+        url: `${BASE}/api/serverless/v1/groups/team/functions/image-resizer/webhook/rotate`,
+        method: "POST",
+        body: null,
+      },
+    ]);
+    // The token is the point of the call: it is shown, not redacted.
+    expect(hook.token).toBe("new-token");
+    expect(hook.events).toEqual(["push"]);
+  });
+
+  it("percent-encodes the group and name", async () => {
+    const calls = stubFetch({ url: "u", token: "t", provider: "gitlab", events: ["push"] });
+
+    await rotateFunctionWebhook("team space", "a/b", "tok");
+
+    expect(calls[0].url).toBe(
+      `${BASE}/api/serverless/v1/groups/team%20space/functions/a%2Fb/webhook/rotate`,
+    );
   });
 });
 
