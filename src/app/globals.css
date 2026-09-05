@@ -1600,6 +1600,44 @@ code {
   max-width: 320px;
 }
 
+/* Git webhook (function Advanced tab): the URL and token to paste into the
+   provider, each with its own copy button. The value keeps the full width it
+   can get and scrolls rather than wrapping, so a long URL or token stays one
+   selectable line. */
+.webhook {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.webhook__field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.webhook__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 92px;
+}
+.webhook__value {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.webhook__actions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
 /* Bottom-right creation-progress toasts (non-blocking, above the content). */
 .toasts {
   position: fixed;

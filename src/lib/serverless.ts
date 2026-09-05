@@ -156,7 +156,16 @@ export interface WorkloadDetail {
   // default (that default is on GET .../functions/info as `defaultVersion`).
   version?: string | null;
   gitRepo?: string | null;
-  branch?: string | null;
+  // What the function builds: a branch, a tag, or a commit - git resolves all
+  // three the same way, so the API takes one field for the three.
+  revision?: string | null;
+  // The commit a git push pinned, or null while the build follows `revision`.
+  // Read-only: the webhook sets it, and both human writes (POST .../build and
+  // PUT) clear it, returning the function to its revision's head.
+  commit?: string | null;
+  // How to configure a git push to build this function. Present on a full GET
+  // (and on the create's 202); null on a response that read no secret.
+  webhook?: WebhookView | null;
   // Sub-directory inside the repo the function is built from; null/"" is the root.
   path?: string | null;
   // The function's image build state on the local region (kpack). Absent on a region
@@ -168,6 +177,24 @@ export interface WorkloadDetail {
   // The port the workload listens on. Null when it was created without an
   // explicit port and runs on the platform default (see /info's `port.default`).
   port?: number | null;
+}
+
+/**
+ * Everything needed to point a git push at a function
+ * (`FunctionResponse.webhook`). Unlike `gitToken`, `token` is shown: it is the
+ * platform's own credential, minted so it can be pasted into the provider, and
+ * anyone who can read the function can already start a build with their bearer.
+ * Its only writer is `POST .../{name}/webhook/rotate`.
+ */
+export interface WebhookView {
+  /** The URL the provider posts to - the function's own `/build` endpoint. */
+  url: string;
+  /** The secret the provider sends back as `X-Gitlab-Token`. */
+  token: string;
+  /** The git provider the hook is described for (currently "gitlab"). */
+  provider: string;
+  /** The events the hook should send (currently just "push"). */
+  events: string[];
 }
 
 /** A function's image build state (kpack), from `FunctionResponse.build`. */
@@ -392,7 +419,8 @@ export interface FileInput {
 export interface FunctionCreateInput {
   name: string;
   gitRepo: string;
-  branch: string;
+  // Branch, tag or commit SHA; defaults to "main" when omitted.
+  revision: string;
   // Sub-directory inside the repo to build from; "" (or omitted) is the root.
   path?: string;
   gitToken: string;
@@ -406,17 +434,18 @@ export interface FunctionCreateInput {
   files: FileInput[];
   scaling: ScalingInput;
   size: string;
-  regions?: string[] | null;
   hostname?: string | null;
 }
 
 export interface FunctionUpdateInput {
   // Full replace: the build inputs are the complete desired state. gitRepo and
-  // runtime are required (like create); branch defaults to "main". Only the git
+  // runtime are required (like create); revision defaults to "main". Only the git
   // token is keep-on-omit (redacted, can't be read back) - blank keeps the
   // stored one, a value rotates it.
   gitRepo: string;
-  branch: string;
+  // Replaced like every non-secret field, and it clears any commit a push
+  // pinned: the function goes back to this revision's head.
+  revision: string;
   // Sub-directory inside the repo to build from; "" (or omitted) is the root.
   path?: string;
   gitToken?: string | null;
@@ -444,7 +473,6 @@ export interface ContainerCreateInput {
   files: FileInput[];
   scaling: ScalingInput;
   size: string;
-  regions?: string[] | null;
   hostname?: string | null;
 }
 
@@ -794,6 +822,25 @@ export function buildFunction(
     `${collectionPath("function", group)}/${encodeURIComponent(name)}/build`,
     accessToken,
   );
+}
+
+/**
+ * Replace the function's webhook token and read the new one back
+ * (`POST .../functions/{name}/webhook/rotate`). 200 - every region is written
+ * before the API answers, so the old token stops working at once and the hook
+ * must be reconfigured with what comes back. This is the token's only writer: a
+ * `PUT` never carries it.
+ */
+export function rotateFunctionWebhook(
+  group: string,
+  name: string,
+  accessToken: string | undefined,
+): Promise<WebhookView> {
+  return apiSend<WebhookView>(
+    "POST",
+    `${collectionPath("function", group)}/${encodeURIComponent(name)}/webhook/rotate`,
+    accessToken,
+  ) as Promise<WebhookView>;
 }
 
 /**

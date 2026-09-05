@@ -121,7 +121,7 @@ export default function WorkloadForm({
   // Identity / source
   const [name, setName] = useState(initial?.name ?? "");
   const [gitRepo, setGitRepo] = useState(initial?.gitRepo ?? "");
-  const [branch, setBranch] = useState(initial?.branch ?? "main");
+  const [revision, setRevision] = useState(initial?.revision ?? "main");
   const [path, setPath] = useState(initial?.path ?? "");
   const [gitToken, setGitToken] = useState("");
   // Runtimes are objects ({name, versions, defaultVersion}); the picker deals in
@@ -370,18 +370,17 @@ export default function WorkloadForm({
     startTransition(async () => {
       let res: ActionError | void;
       if (mode === "create") {
-        // Placement is always cluster-wide: send no regions so the API deploys to
-        // every region (the console does not expose per-region targeting).
+        // Placement is not a client choice: a workload is deployed to every
+        // configured region, so no create body carries regions at all.
         if (isFn) {
           const spec: FunctionCreateInput = {
             name,
             gitRepo,
-            branch: branch || "main",
+            revision: revision.trim() || "main",
             path: path.trim(),
             gitToken,
             runtime,
             version: version.trim() === "" ? null : version,
-            regions: null,
             ...common,
           };
           res = await createWorkloadAction("function", spec);
@@ -391,7 +390,6 @@ export default function WorkloadForm({
             image,
             registryUsername: registryUsername.trim() || null,
             registryToken: registryToken.trim() || null,
-            regions: null,
             ...common,
           };
           res = await createWorkloadAction("container", spec);
@@ -400,10 +398,10 @@ export default function WorkloadForm({
         const spec: FunctionUpdateInput = {
           // Full replace: the build inputs are the complete desired state and are
           // always sent. The API rebuilds only when one actually changes (or the
-          // token is rotated), so re-sending unchanged values is a no-op. branch
-          // defaults to main; the git token is sent only to rotate it.
+          // token is rotated), so re-sending unchanged values is a no-op. The
+          // revision defaults to main; the git token is sent only to rotate it.
           gitRepo,
-          branch: branch.trim() || "main",
+          revision: revision.trim() || "main",
           path: path.trim(),
           runtime,
           version: version.trim() === "" ? null : version,
@@ -489,8 +487,11 @@ export default function WorkloadForm({
           A secret left blank keeps its stored value — enter a value to change it, or remove the row
           to delete it.
           {isFn
-            ? " Leave the git token blank to keep the stored one, or enter one to rotate it; changing the repo, branch, or runtime rebuilds with the stored token."
+            ? " Leave the git token blank to keep the stored one, or enter one to rotate it; changing the repo, revision, or runtime rebuilds with the stored token."
             : " Leave the registry token blank to keep it, or clear the username to remove the pull secret."}
+          {isFn && initial?.commit
+            ? ` Saving also drops the commit a push pinned (${initial.commit.slice(0, 12)}) and builds ${initial.revision ?? "the revision"} at its head.`
+            : null}
         </div>
       )}
 
@@ -538,11 +539,15 @@ export default function WorkloadForm({
                 />
               </label>
               <label className="field">
-                <span className="field__label">Branch</span>
+                <span className="field__label">
+                  Revision
+                  <FieldHelp text="What to build: a branch, a tag, or a commit SHA. A branch follows its head — a tag or a commit stays put, and no push moves it. Defaults to main." />
+                </span>
                 <input
                   className="input"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
+                  value={revision}
+                  onChange={(e) => setRevision(e.target.value)}
+                  placeholder="main"
                 />
               </label>
               <label className="field field--full">

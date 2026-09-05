@@ -22,6 +22,7 @@ import {
   getWorkloadStats,
   mintStreamTicket,
   pullContainer,
+  rotateFunctionWebhook,
   serverlessErrorBody,
   streamBaseUrl,
   typeSegment,
@@ -33,6 +34,7 @@ import {
   type FunctionUpdateInput,
   type PodLogSnapshot,
   type PodRoster,
+  type WebhookView,
   type WorkloadStats,
   type WorkloadType,
 } from "@/lib/serverless";
@@ -127,6 +129,28 @@ export async function pullContainerAction(name: string): Promise<ActionError | v
     return toActionError(err);
   }
   revalidatePath(`/serverless/containers/${name}`);
+}
+
+/**
+ * Replace the function's git-webhook token (POST .../webhook/rotate) and hand
+ * the new one back to the caller, which shows it so the hook can be
+ * reconfigured. The API writes every region before answering, so the old token
+ * is already dead when this returns - there is no overlap window to warn about.
+ */
+export async function rotateWebhookAction(
+  name: string,
+): Promise<{ webhook: WebhookView } | ActionError> {
+  const ctx = await requireContext();
+  if ("fail" in ctx) return ctx.fail;
+
+  let webhook: WebhookView;
+  try {
+    webhook = await rotateFunctionWebhook(ctx.group, name, ctx.accessToken);
+  } catch (err) {
+    return toActionError(err);
+  }
+  revalidatePath(`/serverless/functions/${name}`);
+  return { webhook };
 }
 
 /** What a client stream component asks to follow. */
